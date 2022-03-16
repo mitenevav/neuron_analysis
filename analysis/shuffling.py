@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from tqdm.notebook import tqdm
 
+from analysis.functions import corr_df_to_distribution, active_df_to_dict
 from analysis.minian import MinianAnalysis
 
 sns.set(color_codes=True)
@@ -22,11 +23,11 @@ class ShuffleAnalysis:
             ma_o = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
             ma_o.active_state_df = pd.read_csv(f'{self.path_to_data}/{date}/results/active_states_spike.csv',
                                                index_col=0).astype(bool)
-            ma_o.active_state = transform(ma_o.active_state_df)
+            ma_o.active_state = active_df_to_dict(ma_o.active_state_df)
 
             ma_s = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
             ma_s.active_state_df = ma_o.active_state_df.apply(self.shuffle_signal)
-            ma_s.active_state = transform(ma_s.active_state_df)
+            ma_s.active_state = active_df_to_dict(ma_s.active_state_df)
 
             self.original_data[date] = ma_o
             self.shuffled_data[date] = ma_s
@@ -89,12 +90,12 @@ class ShuffleAnalysis:
         dates_df = []
 
         for date in tqdm(self.dates):
-            corr = compute_corr(self.original_data[date].get_correlation(corr_type))
+            corr = corr_df_to_distribution(self.original_data[date].get_correlation(corr_type))
             values += corr
             models += ['original'] * len(corr)
             dates_df += [date] * len(corr)
 
-            corr = compute_corr(self.shuffled_data[date].get_correlation(corr_type))
+            corr = corr_df_to_distribution(self.shuffled_data[date].get_correlation(corr_type))
             values += corr
             models += ['shuffle'] * len(corr)
             dates_df += [date] * len(corr)
@@ -180,27 +181,3 @@ class ShuffleAnalysis:
         ax[1].set_ylabel('Нейроны', fontsize=18)
 
         plt.show()
-
-
-def compute_corr(df):
-    c = 1
-    corr = []
-    for i, row in df.iterrows():
-        for j in df.columns.tolist()[c:]:
-            corr.append(row[j])
-
-        c += 1
-    return corr
-
-
-def transform(df):
-    d = {}
-    for col in df:
-        sig = df[col]
-        active = sig[sig == True]
-
-        idx = active.reset_index()[['index']].diff()
-        idx = idx[idx['index'] > 1]
-
-        d[col] = np.array_split(np.array(active.index.tolist()), idx.index.tolist())
-    return d
