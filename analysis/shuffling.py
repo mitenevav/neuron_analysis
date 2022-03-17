@@ -11,7 +11,7 @@ sns.set(color_codes=True)
 
 
 class ShuffleAnalysis:
-    def __init__(self, path_to_data, dates, fps):
+    def __init__(self, path_to_data, dates, fps, shuffle_fraction=1.):
         self.dates = dates
         self.path_to_data = path_to_data
         self.fps = fps
@@ -26,7 +26,10 @@ class ShuffleAnalysis:
             ma_o.active_state = active_df_to_dict(ma_o.active_state_df)
 
             ma_s = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
-            ma_s.active_state_df = ma_o.active_state_df.apply(self.shuffle_signal)
+
+            ma_s.active_state_df = ma_o.active_state_df.copy()
+            idx = ma_s.active_state_df.sample(axis=1, frac=shuffle_fraction).columns
+            ma_s.active_state_df[idx] = ma_s.active_state_df[idx].apply(self.shuffle_signal)
             ma_s.active_state = active_df_to_dict(ma_s.active_state_df)
 
             self.original_data[date] = ma_o
