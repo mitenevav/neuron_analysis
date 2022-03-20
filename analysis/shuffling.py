@@ -29,7 +29,7 @@ class ShuffleAnalysis:
 
             ma_s.active_state_df = ma_o.active_state_df.copy()
             idx = ma_s.active_state_df.sample(axis=1, frac=shuffle_fraction).columns
-            ma_s.active_state_df[idx] = ma_s.active_state_df[idx].apply(self.shuffle_signal)
+            ma_s.active_state_df[idx] = ma_s.active_state_df[idx].apply(self.shuffle_signal).astype(bool)
             ma_s.active_state = active_df_to_dict(ma_s.active_state_df)
 
             self.original_data[date] = ma_o
