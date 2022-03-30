@@ -389,6 +389,41 @@ class MinianAnalysis:
         plt.yticks(fontsize=14)
         plt.show()
 
+    def save_burst_rate(self):
+        """
+        Function for saving burst rate
+        Burst rate - number of cell activations per minute
+        """
+        burst_rate = self.burst_rate()
+        burst_rate.to_csv(self.results_folder + '/burst_rate.csv')
+
+    def save_network_spike_rate(self, period):
+        """
+        Function for saving network spike rate
+        Network spike rate - percentage of active neurons per period
+        :param period: period in seconds
+        """
+        nsr = self.network_spike_rate(period)
+        nsr.to_csv(self.results_folder + '/network_spike_rate.csv')
+
+    def save_network_spike_duration(self, thresholds):
+        """
+        Function for saving network spike duration
+        Network spike duration - duration when the percentage of active cells is above the set thresholds
+        :param thresholds: threshold values in percentages
+        """
+        nsd_df = self.network_spike_duration(thresholds)
+        nsd_df.to_csv(self.results_folder + '/network_spike_duration.csv')
+
+    def save_network_spike_peak(self, period):
+        """
+        Function for saving network spike peak
+        Network spike peak - maximum percentage of active cells per second
+        :param period: period in seconds
+        """
+        nsp_df = self.network_spike_peak(period)
+        nsp_df.to_csv(self.results_folder + '/network_spike_peak.csv')
+
     def compute_nzsfi(self):
         """
         Function for computing NonZeroSpikeFramesIntersection
