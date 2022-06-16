@@ -263,19 +263,20 @@ class MinianAnalysis:
             nsr[f'{x}-{x + step}'] = len(periods[x][periods[x] == True])
 
         nsr = pd.DataFrame(nsr, index=['spike rate'])
-        nsr = nsr / len(self.active_state_df) * 100
+        nsr = nsr / len(self.active_state_df.columns) * 100
 
         return nsr
 
-    def network_spike_duration(self, thresholds):
+    def network_spike_duration(self, thresholds, verbose=True):
         """
         Function for computing network spike duration
         Network spike duration - duration when the percentage of active cells is above the set thresholds
         :param thresholds: threshold values in percentages
+        :param verbose: progressbar
         """
         spike_durations = []
 
-        for thr in tqdm(thresholds):
+        for thr in tqdm(thresholds, disable=(not verbose)):
             percent_thr = len(self.active_state_df.columns) * thr / 100
             duration = 0
             for _, row in self.active_state_df.iterrows():
@@ -307,7 +308,7 @@ class MinianAnalysis:
             spike_peaks[f'{i}-{i + step}'] = peak
 
         nsp_df = pd.DataFrame(spike_peaks, index=['peak'])
-        nsp_df = nsp_df / len(self.active_state_df) * 100
+        nsp_df = nsp_df / len(self.active_state_df.columns) * 100
 
         return nsp_df
 
@@ -452,7 +453,7 @@ class MinianAnalysis:
 
         return spike_acc.T.set_axis(self.active_state_df.columns, axis=1)
 
-    def get_correlation(self, method='signal'):
+    def get_correlation(self, method='signal', position=False):
         """
         Function for computing correlation
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -460,6 +461,7 @@ class MinianAnalysis:
             diff   - Pearson correlation for derivative of signal intensity
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
+        :param position: consideration of spatial position
         """
         if method == 'signal':
             corr_df = self.signals.corr()
@@ -473,6 +475,14 @@ class MinianAnalysis:
             print(f'Method {method} is not supported!')
             return
 
+        if position:
+            distances = self.positions.apply(
+                lambda x: ((self.positions['x'] - x['x']) ** 2 + (self.positions['y'] - x['y']) ** 2) ** (1 / 2),
+                axis=1
+            )
+
+            corr_df = (1 - 100 / (distances + 100)) * corr_df.values  # 100 is 25% of distance
+
         return corr_df
 
     def save_active_states(self):
@@ -484,7 +494,7 @@ class MinianAnalysis:
         self.active_state_df.astype(int).to_csv(
             path.join(self.results_folder, f'active_states_{self.type_of_activity}.csv'))
 
-    def save_correlation_matrix(self, method='signal'):
+    def save_correlation_matrix(self, method='signal', position=False):
         """
         Function for saving correlation matrix to results folder
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -492,15 +502,17 @@ class MinianAnalysis:
             diff   - Pearson correlation for derivative of signal intensity
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
+        :param position: consideration of spatial position
         """
-        corr_df = self.get_correlation(method)
+        corr_df = self.get_correlation(method, position)
 
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
 
-        corr_df.to_csv(path.join(self.results_folder, f'correlation_{self.type_of_activity}_{method}.csv'))
+        corr_df.to_csv(path.join(self.results_folder,
+                                 f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.csv"))
 
-    def show_corr(self, threshold, method='signal'):
+    def show_corr(self, threshold, method='signal', position=False):
         """
         Function for plotting correlation distribution and map
         :param threshold: threshold for displayed correlation
@@ -509,8 +521,9 @@ class MinianAnalysis:
             diff   - Pearson correlation for derivative of signal intensity
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
+        :param position: consideration of spatial position
         """
-        corr_df = self.get_correlation(method)
+        corr_df = self.get_correlation(method, position)
 
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
 

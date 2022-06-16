@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from scipy.stats import kstest, mannwhitneyu, ks_2samp
+from scipy.stats import kstest, mannwhitneyu, ks_2samp, wilcoxon
 from tqdm.notebook import tqdm
 
 from analysis.functions import corr_df_to_distribution, active_df_to_dict
@@ -12,14 +12,18 @@ sns.set(color_codes=True)
 
 
 class StatTests:
-    def __init__(self, path_to_data, dates, fps):
-        self.corr_types = [
+    def __init__(self, path_to_data, dates, fps, verbose=True):
+        self.base_correlations = [
             'signal',
             'diff',
             'active',
             'active_acc',
         ]
+
+        self.corr_types = self.base_correlations + [x + '_position' for x in self.base_correlations]
+
         self.fps = fps
+        self.verbose = verbose
 
         self.corr_dfs = {}
         self.corr_distr = {}
@@ -32,8 +36,8 @@ class StatTests:
             df_dict = {}
             for t in self.corr_types:
                 corr_df = pd.read_csv(f'{self.path_to_data}/{date}/results/correlation_spike_{t}.csv', index_col=0)
-                df_dict[t] = corr_df.copy()
 
+                df_dict[t] = corr_df.copy()
                 distr_dict[t] = corr_df_to_distribution(corr_df)
 
             self.corr_dfs[date] = df_dict
@@ -52,12 +56,13 @@ class StatTests:
         nsp = pd.DataFrame()
         nsd = pd.DataFrame()
 
-        for date in tqdm(self.signals):
+        for date in tqdm(self.signals, disable=(not self.verbose)):
             br = br.append(self.signals[date].burst_rate()['activations per min'].rename(date))
             nsr = nsr.append(self.signals[date].network_spike_rate(1).T['spike rate'].rename(date))
             nsp = nsp.append(self.signals[date].network_spike_peak(1).T['peak'].rename(date))
             nsd = nsd.append(
-                self.signals[date].network_spike_duration(np.arange(3, 63, 3))['Network spike duration'].rename(date))
+                self.signals[date].network_spike_duration(np.arange(3, 63, 3), verbose=False)[
+                    'Network spike duration'].rename(date))
 
         self.br = br.T
         self.nsr = nsr.T
@@ -71,10 +76,15 @@ class StatTests:
                 self.all_corr = self.all_corr.append(
                     pd.DataFrame({'values': self.corr_distr[date][t], 'date': date, 'type': t}))
 
-    def show_correlation_distribution(self, method='kde'):
+    def show_correlation_distribution(self, method='kde', position=False):
+        if position:
+            corr_types = [x + '_position' for x in self.base_correlations]
+        else:
+            corr_types = self.base_correlations
+
         if method == 'box':
             plt.figure(figsize=(12, 10))
-            sns.boxplot(data=self.all_corr, y='values', hue='date', x='type')
+            sns.boxplot(data=self.all_corr[self.all_corr['type'].isin(corr_types)], y='values', hue='date', x='type')
             plt.title('Correlation distribution', fontsize=17)
             plt.xlabel('type', fontsize=16)
             plt.ylabel('Correlation', fontsize=16)
@@ -86,7 +96,7 @@ class StatTests:
         elif method == 'hist':
             fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
-            for t, ax in zip(self.corr_types, axs.flatten()):
+            for t, ax in zip(corr_types, axs.flatten()):
                 df = pd.DataFrame()
 
                 for date in self.dates:
@@ -104,7 +114,7 @@ class StatTests:
         else:
             fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
-            for t, ax in zip(self.corr_types, axs.flatten()):
+            for t, ax in zip(corr_types, axs.flatten()):
 
                 for date in self.dates:
                     sns.kdeplot(self.corr_distr[date][t],
@@ -211,3 +221,137 @@ class StatTests:
             ax.legend(fontsize=16)
 
         plt.show()
+
+    def show_degree_of_network(self,
+                               interval=(0, 1),
+                               step=0.01,
+                               position=False):
+        degree_of_network = self.get_degree_of_network(interval, step, position)
+
+        fig, axs = plt.subplots(2, 2, figsize=(18, 15))
+
+        if position:
+            corr_types = [x + '_position' for x in self.base_correlations]
+        else:
+            corr_types = self.base_correlations
+
+        for corr_type, ax in zip(corr_types, axs.flatten()):
+            ax.set_xlabel('Network threshold', fontsize=16)
+            ax.set_ylabel('Network degree', fontsize=16)
+            ax.set_title(f'Degree of network ({corr_type})', fontsize=18)
+            ax.tick_params(axis='both', labelsize=14)
+            thrs = np.arange(interval[0], interval[1], step)
+            for date in self.dates:
+                ax.plot(thrs,
+                        degree_of_network[corr_type][date],
+                        lw=2.5,
+                        label=f'{date} - {len(self.corr_dfs[date][corr_type])} neurons'
+                        )
+
+            ax.legend(fontsize=15)
+        plt.show()
+
+    def get_degree_of_network(self,
+                              interval=(0, 1),
+                              step=0.01,
+                              position=False):
+        degree_of_network = {}
+
+        if position:
+            corr_types = [x + '_position' for x in self.base_correlations]
+        else:
+            corr_types = self.base_correlations
+
+        for corr_type in corr_types:
+            values = {}
+            thrs = np.arange(interval[0], interval[1], step)
+            for date in self.dates:
+                corr = np.array(self.corr_distr[date][corr_type])
+                values[date] = [(corr > thr).sum() / len(corr) for thr in thrs]
+
+            degree_of_network[corr_type] = values
+        return degree_of_network
+
+    def show_distribution_of_network_degree(self, q=0.9, position=False):
+        degree_distribution = self.get_distribution_of_network_degree(q, position)
+        fig, axs = plt.subplots(2, 2, figsize=(18, 15))
+
+        if position:
+            corr_types = [x + '_position' for x in self.base_correlations]
+        else:
+            corr_types = self.base_correlations
+
+        for corr_type, ax in zip(corr_types, axs.flatten()):
+
+            ax.set_xlabel('Network degree', fontsize=16)
+            ax.set_ylabel('Coactive units degree', fontsize=16)
+            ax.set_title(f'Distribution of network degree ({corr_type})', fontsize=18)
+            ax.tick_params(axis='both', labelsize=14)
+            for date in self.dates:
+                degree = degree_distribution[corr_type][date]
+                num_of_neurons = len(self.corr_dfs[date][corr_type])
+                sns.lineplot(x=degree.index / num_of_neurons,
+                             y=degree / num_of_neurons,
+                             lw=2.2,
+                             label=f'{date} - {num_of_neurons} neurons',
+                             ax=ax)
+
+            ax.legend(fontsize=15)
+        plt.show()
+
+    def get_distribution_of_network_degree(self, q=0.9, position=False):
+        degree_distribution = {}
+
+        if position:
+            corr_types = [x + '_position' for x in self.base_correlations]
+        else:
+            corr_types = self.base_correlations
+
+        for corr_type in corr_types:
+            total_distr = []
+            for date in self.dates:
+                total_distr += self.corr_distr[date][corr_type]
+
+            thr = np.quantile(total_distr, q=q)
+
+            degrees = {}
+            for date in self.dates:
+                corr_df = self.corr_dfs[date][corr_type]
+                degree = ((corr_df > thr).sum() - 1).value_counts().sort_index()
+                degrees[date] = degree
+
+            degree_distribution[corr_type] = degrees
+        return degree_distribution
+
+    def __wilcoxon_test(self, data, alpha=0.005):
+        dist_tets = pd.DataFrame(columns=[True, False])
+
+        n = (len(self.dates) ** 2 - len(self.dates)) / 2
+
+        alpha = alpha / n
+
+        test_res = {}
+        for t in data:
+            lst = []
+            for i in range(len(self.dates) - 1):
+                for j in range(i + 1, len(self.dates)):
+                    p = wilcoxon(data[t][self.dates[i]], data[t][self.dates[j]])[1]
+                    lst.append(p)
+            test_res[t] = (pd.Series(lst) > alpha).value_counts()
+
+        test_res = pd.DataFrame(test_res).T.reset_index().rename(columns={'index': 'type'})
+        dist_tets = dist_tets.append(test_res)
+        dist_tets = dist_tets.groupby(['type']).agg({True: 'first', False: 'first'}).fillna(0).astype(int)
+        return dist_tets
+
+    def get_connectivity_test(self,
+                              interval=(0, 1),
+                              step=0.01,
+                              position=False):
+
+        data = self.get_degree_of_network(interval=interval, step=step, position=position)
+        return self.__wilcoxon_test(data)
+
+    def get_connectivity_distr_test(self, q=0.9, position=False):
+        data = self.get_distribution_of_network_degree(q=q, position=position)
+        return self.__distr_test(data)

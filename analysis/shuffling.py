@@ -11,18 +11,26 @@ sns.set(color_codes=True)
 
 
 class ShuffleAnalysis:
-    def __init__(self, path_to_data, dates, fps, shuffle_fraction=1.):
+    def __init__(self,
+                 path_to_data,
+                 dates,
+                 fps,
+                 shuffle_fraction=1.,
+                 verbose=True):
+
         self.dates = dates
         self.path_to_data = path_to_data
         self.fps = fps
+        self.verbose = verbose
 
         self.original_data = {}
         self.shuffled_data = {}
 
-        for date in tqdm(self.dates):
+        for date in tqdm(self.dates, disable=(not self.verbose)):
             ma_o = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
             ma_o.active_state_df = pd.read_csv(f'{self.path_to_data}/{date}/results/active_states_spike.csv',
                                                index_col=0).astype(bool)
+
             ma_o.active_state = active_df_to_dict(ma_o.active_state_df)
 
             ma_s = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
@@ -87,23 +95,18 @@ class ShuffleAnalysis:
 
         return shuff
 
-    def correlation_dist(self, corr_type='active'):
-        values = []
-        models = []
-        dates_df = []
+    def correlation_dist(self, corr_type='active', position=False):
+        df = pd.DataFrame(columns=['date', 'model', 'values'])
 
         for date in tqdm(self.dates):
-            corr = corr_df_to_distribution(self.original_data[date].get_correlation(corr_type))
-            values += corr
-            models += ['original'] * len(corr)
-            dates_df += [date] * len(corr)
+            corr = corr_df_to_distribution(self.original_data[date].get_correlation(corr_type, position))
+            df = df.append(pd.DataFrame({'date': date, 'model': 'original', 'values': corr}))
 
-            corr = corr_df_to_distribution(self.shuffled_data[date].get_correlation(corr_type))
-            values += corr
-            models += ['shuffle'] * len(corr)
-            dates_df += [date] * len(corr)
+            corr = corr_df_to_distribution(self.shuffled_data[date].get_correlation(corr_type, position))
+            df = df.append(pd.DataFrame({'date': date, 'model': 'shuffle', 'values': corr}))
 
-        df = pd.DataFrame({'values': values, 'model': models, 'date': dates_df})
+        df = df.fillna(0)
+
         ptp = df.groupby(['model', 'date']).agg({'values': np.ptp}).reset_index()
         diff = ptp.groupby(['date']).agg({'model': list, 'values': np.diff}).reset_index()
         diff['values'] = -diff['values']
