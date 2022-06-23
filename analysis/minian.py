@@ -5,12 +5,19 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm.notebook import tqdm
 from scipy import ndimage
+from os import path, mkdir
 
 sns.set(color_codes=True)
-from os import path, mkdir
 
 
 class MinianAnalysis:
+    """
+    Class for processing data after minian.
+    It solves tasks:
+    * active state detection
+    * calculation of statistics
+    * visualisation
+    """
     def __init__(self, path_to_data, fps, path_to_results=None):
         """
         Initialization function

@@ -11,6 +11,9 @@ sns.set(color_codes=True)
 
 
 class MultipleShuffler:
+    """
+    Class for multiple generation of shuffled signals and their analysis
+    """
     def __init__(self,
                  path_to_data,
                  dates,
@@ -20,14 +23,16 @@ class MultipleShuffler:
                  correlation_type='active',
                  verbose=True):
         """
-
-        :param path_to_data:
-        :param dates:
-        :param fps:
-        :param num_of_shuffles:
-        :param shuffle_fractions:
-        :param correlation_type:
-        :param verbose:
+        Initialization function
+        :param path_to_data: path to directory with sessions folders
+        :param dates: folders session names
+        :param fps: frames per second
+        :param num_of_shuffles: number of shuffles per case
+        :param shuffle_fractions: fraction of shuffled neurons
+        :param correlation_type: type of correlation for analysis
+                * active
+                * active_acc
+        :param verbose: visualization of interim results and progress
         """
 
         if shuffle_fractions is None:
@@ -48,6 +53,9 @@ class MultipleShuffler:
         self.corr_df = self._create_corrs()
 
     def _generate_models(self):
+        """
+        Function for generating shuffled models
+        """
         models = {0: {0: ShuffleAnalysis(self.path_to_data,
                                          self.dates, self.fps,
                                          shuffle_fraction=0,
@@ -68,6 +76,9 @@ class MultipleShuffler:
         return models
 
     def _create_stats(self):
+        """
+        Function for computing statistics of generated models
+        """
         stat_df = pd.DataFrame()
         for shuffle_fraction in tqdm(self.models,
                                      disable=(not self.verbose),
@@ -91,6 +102,9 @@ class MultipleShuffler:
         return stat_df.reset_index(drop=True)
 
     def _create_corrs(self):
+        """
+        Function for computing correlations of generated models
+        """
         corr_df = pd.DataFrame()
 
         for shuffle_fraction in tqdm(self.models,
@@ -119,6 +133,10 @@ class MultipleShuffler:
 
     def show_day_mean_correlation_range(self,
                                         position=False):
+        """
+        Function for plotting average correlation range by sessions
+        :param position: consideration of spatial position
+        """
         ptr = (
             self.corr_df[self.corr_df['position'] == position]
                 .groupby(['shuffle_fraction', 'date', 'attempt']).agg({'corr': np.ptp})
@@ -136,6 +154,9 @@ class MultipleShuffler:
         plt.show()
 
     def show_position_mean_correlation_range(self):
+        """
+        Function for plotting average correlation range by with/without position consideration
+        """
         ptr = (
             self.corr_df
                 .groupby(['position', 'shuffle_fraction', 'date', 'attempt']).agg({'corr': np.ptp})
@@ -155,6 +176,13 @@ class MultipleShuffler:
     def show_mean_statistic_peak(self,
                                  daily=False,
                                  statistic_type='network spike peak'):
+        """
+        Function for plotting average peak of statistic
+        :param daily: daily average or only average by  shuffle fraction
+        :param statistic_type: type of statistic
+                * network spike peak (default)
+                * network spike rate
+        """
         plt.figure(figsize=(15, 8))
 
         if daily:

@@ -11,7 +11,16 @@ sns.set(color_codes=True)
 
 
 class DistanceAnalysis:
+    """
+    Class for analysing distance between neurons
+    """
     def __init__(self, path_to_data, dates, fps):
+        """
+                Initialization function
+        :param path_to_data: path to directory with sessions folders
+        :param dates: folders session names
+        :param fps: frames per second
+        """
         self.base_correlations = [
             'signal',
             'active',
@@ -56,6 +65,9 @@ class DistanceAnalysis:
         self.distance_df = self.create_distance_df()
 
     def plot_radius_dependency(self):
+        """
+        Function for plotting distribution of rho and the dependence of the average signal intensity and activity on it
+        """
         df = pd.DataFrame()
         for date in self.models:
             model = self.models[date]
@@ -97,6 +109,9 @@ class DistanceAnalysis:
         plt.show()
 
     def create_distance_df(self):
+        """
+        Function for creating DataFrame with distance information
+        """
         df = pd.DataFrame()
         for date in self.dates:
             day_df = pd.DataFrame()
@@ -121,6 +136,12 @@ class DistanceAnalysis:
         return df
 
     def plot_distance_distribution(self, dist_type='euclidean'):
+        """
+        Function for plotting distance distribution
+        :param dist_type: type of distance
+                * 'euclidean'
+                * 'radial'
+        """
         plt.figure(figsize=(8, 6))
         sns.boxplot(data=self.distance_df, x=dist_type, y='date')
 
@@ -131,6 +152,15 @@ class DistanceAnalysis:
         plt.show()
 
     def plot_dependency(self, x, y):
+        """
+        Function for plotting dependence of x on y
+        :param x, y: column
+                * 'euclidean' (distance)
+                * 'radial' (distance)
+                * 'signal' (correlation)
+                * 'active' (correlation)
+                * 'active_acc' (correlation)
+        """
         plt.figure(figsize=(8, 6))
 
         sns.scatterplot(data=self.distance_df, x=x, y=y, hue='date')

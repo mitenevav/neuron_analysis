@@ -2,6 +2,11 @@ import numpy as np
 
 
 def corr_df_to_distribution(df):
+    """
+    Function for transforming symmetric dataframe to list of values (only values above (below) the main diagonal)
+    :param df: symmetric dataframe
+    :return: list of values
+    """
     c = 1
     corr = []
     for i, row in df.iterrows():
@@ -13,6 +18,11 @@ def corr_df_to_distribution(df):
 
 
 def active_df_to_dict(df):
+    """
+    Function for transforming dataframe of active states to dict
+    :param df: DataFrame of active states
+    :return: dict with indexes of active states
+    """
     d = {}
     for col in df:
         sig = df[col]

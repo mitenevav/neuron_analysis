@@ -11,12 +11,23 @@ sns.set(color_codes=True)
 
 
 class ShuffleAnalysis:
+    """
+    Class for randomly shuffling neuron activity
+    """
     def __init__(self,
                  path_to_data,
                  dates,
                  fps,
                  shuffle_fraction=1.,
                  verbose=True):
+        """
+        Initialization function
+        :param path_to_data: path to directory with sessions folders
+        :param dates: folders session names
+        :param fps: frames per second
+        :param shuffle_fraction: fraction of shuffled neurons
+        :param verbose: visualization of interim results and progress
+        """
 
         self.dates = dates
         self.path_to_data = path_to_data
@@ -45,15 +56,22 @@ class ShuffleAnalysis:
 
     @staticmethod
     def shuffle_signal(signal):
-        res = []
+        """
+        Function for randomly shuffle signal.
+        Duration of active states and interval between them change randomly.
+        :param signal: binary series of signal
+        :return: shuffled signal
+        """
+
+        active_states = []
         sleep = signal[signal == 0].reset_index()
         sleep_min = sleep['index'].min()
 
         if len(sleep) == 0:
-            res = [np.arange(0, len(signal), dtype='int').tolist()]
+            active_states += [np.arange(0, len(signal), dtype='int').tolist()]
         else:
             if sleep_min > 0:
-                res.append(np.arange(0, sleep_min, dtype='int').tolist())
+                active_states.append(np.arange(0, sleep_min, dtype='int').tolist())
 
             sleep['index_diff'] = sleep['index'].diff()
 
@@ -63,15 +81,16 @@ class ShuffleAnalysis:
                 changes['start'] = changes['index'] - changes['index_diff'] + 1
                 changes['end'] = changes['index']
 
-                res += changes.apply(lambda x: np.arange(x['start'], x['end'], dtype='int').tolist(), axis=1).tolist()
+                active_states += changes.apply(lambda x: np.arange(x['start'], x['end'], dtype='int').tolist(),
+                                               axis=1).tolist()
 
                 sleep_max = sleep['index'].max() + 1
                 if sleep_max < len(signal):
-                    res.append(np.arange(sleep_max, len(signal), dtype='int').tolist())
+                    active_states.append(np.arange(sleep_max, len(signal), dtype='int').tolist())
 
         starts = []
         lens = []
-        for x in res:
+        for x in active_states:
             starts.append(x[0])
             lens.append(len(x))
 
@@ -95,7 +114,14 @@ class ShuffleAnalysis:
 
         return shuff
 
-    def correlation_dist(self, corr_type='active', position=False):
+    def correlation_ptp(self, corr_type='active', position=False):
+        """
+        Function for plotting correlation range
+        :param corr_type: type of correlation
+                * active
+                * active_acc
+        :param position: consideration of spatial position
+        """
         df = pd.DataFrame(columns=['date', 'model', 'values'])
 
         for date in tqdm(self.dates):
@@ -129,7 +155,13 @@ class ShuffleAnalysis:
 
         plt.show()
 
-    def statistic_dist(self, stat_type='network_spike_rate'):
+    def statistic_info(self, stat_type='network_spike_rate'):
+        """
+        Function for plotting statistic info
+        :param stat_type: type of statistic
+            * network_spike_rate (default)
+            * network_spike_peak
+        """
         values = []
         models = []
         dates_df = []
@@ -171,6 +203,10 @@ class ShuffleAnalysis:
         plt.show()
 
     def show_shuffling(self, date):
+        """
+        Function for plotting original and shuffled data
+        :param date: name of session
+        """
         fig, ax = plt.subplots(2, 1, figsize=(15, 10))
 
         ax[0].set_title('Исходные данные', fontsize=20)

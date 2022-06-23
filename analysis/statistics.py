@@ -12,7 +12,18 @@ sns.set(color_codes=True)
 
 
 class StatTests:
+    """
+    Class for comparing and analysing different sessions.
+    Based on results of MinianAnalysis
+    """
     def __init__(self, path_to_data, dates, fps, verbose=True):
+        """
+        Initialization function
+        :param path_to_data: path to directory with sessions folders
+        :param dates: folders session names
+        :param fps: frames per second
+        :param verbose: visualization of interim results and progress
+        """
         self.base_correlations = [
             'signal',
             'diff',
@@ -77,6 +88,14 @@ class StatTests:
                     pd.DataFrame({'values': self.corr_distr[date][t], 'date': date, 'type': t}))
 
     def show_correlation_distribution(self, method='kde', position=False):
+        """
+        Function for plotting correlation distribution of sessions
+        :param method: type of chart
+                    * 'kde'. KDE represents the data using a continuous probability density curve. (Default)
+                    * 'box'. Box-and-whisker plot
+                    * 'hist'. Histograms
+        :param position: consideration of spatial position
+        """
         if position:
             corr_types = [x + '_position' for x in self.base_correlations]
         else:
@@ -131,6 +150,11 @@ class StatTests:
             plt.show()
 
     def __distr_test(self, data):
+        """
+        Function for testing the identity of distributions
+        :param data: dict of DataFrames. dict - different types of date. DataFrames columns - different sessions
+        :return: results of testing
+        """
         dist_tets = pd.DataFrame(columns=[True, False])
 
         n = (len(self.dates) ** 2 - len(self.dates)) / 2
@@ -160,6 +184,11 @@ class StatTests:
         return dist_tets
 
     def __norm_test(self, data):
+        """
+        Function for testing normality of distributions
+        :param data: dict of DataFrames. dict - different types of date. DataFrames columns - different sessions
+        :return: results of testing
+        """
         test_df = pd.DataFrame(columns=[True, False])
 
         alpha = 0.05 / len(self.dates)
@@ -179,6 +208,13 @@ class StatTests:
         return test_df
 
     def __get_test_data(self, data_type):
+        """
+        Function for preparing data for tests
+        :param data_type: type of tested data
+                * 'stat'. Distribution of statistics
+                * 'corr'. Distribution of correlation
+        :return: prepared data
+        """
         if data_type == 'corr':
             data = {}
             for t in self.corr_types:
@@ -196,6 +232,16 @@ class StatTests:
             return data
 
     def get_test(self, test_type='distr', data_type='stat'):
+        """
+        Function to perform the test
+        :param test_type: type of test
+                * 'distr'. Testing the identity of distributions
+                * 'norm'. Testing normality of distributions
+        :param data_type: type of tested data
+                * 'stat'. Distribution of statistics
+                * 'corr'. Distribution of correlation
+        :return:
+        """
         data = self.__get_test_data(data_type)
         if test_type == 'norm':
             return self.__norm_test(data)
@@ -203,7 +249,9 @@ class StatTests:
             return self.__distr_test(data)
 
     def show_stats_distribution(self):
-
+        """
+        Function for plotting statistics distribution of sessions
+        """
         fig, axs = plt.subplots(2, 2, figsize=(18, 15))
         for df, name, ax in zip([self.br, self.nsr, self.nsp, self.nsd],
                                 ['Burst rate', 'Network spike rate', 'Network spike peak', 'Network spike duration'],
@@ -226,6 +274,12 @@ class StatTests:
                                interval=(0, 1),
                                step=0.01,
                                position=False):
+        """
+        Function for plotting degree_of_network
+        :param interval: range of x-axis
+        :param step: step on x-axis
+        :param position: consideration of spatial position
+        """
         degree_of_network = self.get_degree_of_network(interval, step, position)
 
         fig, axs = plt.subplots(2, 2, figsize=(18, 15))
@@ -255,6 +309,13 @@ class StatTests:
                               interval=(0, 1),
                               step=0.01,
                               position=False):
+        """
+        Function for computing degree of network
+        :param interval: range of x-axis
+        :param step: step on x-axis
+        :param position: consideration of spatial position
+        :return: dict with degree of network
+        """
         degree_of_network = {}
 
         if position:
@@ -273,6 +334,11 @@ class StatTests:
         return degree_of_network
 
     def show_distribution_of_network_degree(self, q=0.9, position=False):
+        """
+        Function for plotting distribution of network degree
+        :param q: quantile level for all values of this type, the value of which will be the threshold value
+        :param position: consideration of spatial position
+        """
         degree_distribution = self.get_distribution_of_network_degree(q, position)
         fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
@@ -300,13 +366,18 @@ class StatTests:
         plt.show()
 
     def get_distribution_of_network_degree(self, q=0.9, position=False):
-        degree_distribution = {}
-
+        """
+        Function for computing distribution of network degree
+        :param q: quantile level for all values of this type, the value of which will be the threshold value
+        :param position: consideration of spatial position
+        :return: number of coactive neurons for each other
+        """
         if position:
             corr_types = [x + '_position' for x in self.base_correlations]
         else:
             corr_types = self.base_correlations
 
+        degree_distribution = {}
         for corr_type in corr_types:
             total_distr = []
             for date in self.dates:
@@ -324,6 +395,11 @@ class StatTests:
         return degree_distribution
 
     def __wilcoxon_test(self, data, alpha=0.005):
+        """
+        Wilcoxon test
+        :param data: dict of DataFrames. dict - different types of date. DataFrames columns - different sessions
+        :param alpha: p_value threshold
+        """
         dist_tets = pd.DataFrame(columns=[True, False])
 
         n = (len(self.dates) ** 2 - len(self.dates)) / 2
@@ -348,10 +424,20 @@ class StatTests:
                               interval=(0, 1),
                               step=0.01,
                               position=False):
-
+        """
+        Function for testing network degree identity
+        :param interval: range of x-axis
+        :param step: step on x-axis
+        :param position: consideration of spatial position
+        """
         data = self.get_degree_of_network(interval=interval, step=step, position=position)
         return self.__wilcoxon_test(data)
 
     def get_connectivity_distr_test(self, q=0.9, position=False):
+        """
+        Function for testing network degree distribution identity
+        :param q: quantile level for all values of this type, the value of which will be the threshold value
+        :param position: consideration of spatial position
+        """
         data = self.get_distribution_of_network_degree(q=q, position=position)
         return self.__distr_test(data)
