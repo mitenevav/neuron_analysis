@@ -6,7 +6,7 @@ import pandas as pd
 from tqdm.notebook import tqdm
 from scipy import ndimage
 from os import path, mkdir
-
+from analysis.functions import crosscorr
 sns.set(color_codes=True)
 
 
@@ -449,18 +449,46 @@ class MinianAnalysis:
         Function for computing spike accuracy (intersection / union)
         :return: FataFrame with spike accuracy
         """
-        spike_acc = pd.DataFrame()
-        for i in self.active_state_df:
-            row = []
-            for j in self.active_state_df:
-                union = (self.active_state_df[i] & self.active_state_df[j]).sum()
-                intersec = (self.active_state_df[i] | self.active_state_df[j]).sum()
-                row.append((union / intersec))
-            spike_acc[i] = row
+        spike_acc = np.ones((self.active_state_df.shape[1], self.active_state_df.shape[1]))
+        columns = self.active_state_df.columns.tolist()
 
-        return spike_acc.T.set_axis(self.active_state_df.columns, axis=1)
+        for i, col1 in enumerate(columns):
+            if self.active_state_df[col1].sum() == 0:
+                spike_acc[i, :] = 0
+                spike_acc[:, i] = 0
+                spike_acc[i, i] = 1
+                continue
 
-    def get_correlation(self, method='signal', position=False):
+            for j, col2 in enumerate(columns[i + 1:]):
+                intersec = (self.active_state_df[col1] & self.active_state_df[col2]).sum()
+                union = (self.active_state_df[col1] | self.active_state_df[col2]).sum()
+
+                spike_acc[i, i + j + 1] = intersec / union
+                spike_acc[i + j + 1, i] = intersec / union
+
+        return pd.DataFrame(spike_acc).set_axis(columns, axis=0).set_axis(columns, axis=1)
+
+    def compute_cross_correlation(self, data, lag=0):
+        """
+        Function for computing cross_correlation
+        :param lag: lag radius
+        :param data: dataframe with series
+        :return: FataFrame with cross_correlation
+        """
+        if lag == 0:
+            return data.corr()
+
+        cols = data.columns
+        cross_corr_df = pd.DataFrame(columns=cols)
+        for d, i in enumerate(cols):
+            row = cross_corr_df[i].tolist()
+            for j in cols[d:]:
+                row.append(crosscorr(data[i], data[j], lag=lag))
+            cross_corr_df = cross_corr_df.append(pd.Series(row, name=i).set_axis(cols))
+
+        return cross_corr_df
+
+    def get_correlation(self, method='signal', position=False, lag=0):
         """
         Function for computing correlation
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -469,13 +497,14 @@ class MinianAnalysis:
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
         :param position: consideration of spatial position
+        :param lag: lag radius (not used for 'active_acc' method)
         """
         if method == 'signal':
-            corr_df = self.signals.corr()
+            corr_df = self.compute_cross_correlation(self.signals, lag)
         elif method == 'diff':
-            corr_df = self.smooth_diff.corr()
+            corr_df = self.compute_cross_correlation(self.smooth_diff, lag)
         elif method == 'active':
-            corr_df = self.active_state_df.corr()
+            corr_df = self.compute_cross_correlation(self.active_state_df, lag)
         elif method == 'active_acc':
             corr_df = self.compute_spike_accuracy()
         else:
@@ -501,7 +530,7 @@ class MinianAnalysis:
         self.active_state_df.astype(int).to_csv(
             path.join(self.results_folder, f'active_states_{self.type_of_activity}.csv'))
 
-    def save_correlation_matrix(self, method='signal', position=False):
+    def save_correlation_matrix(self, method='signal', position=False, lag=0):
         """
         Function for saving correlation matrix to results folder
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -510,8 +539,9 @@ class MinianAnalysis:
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
         :param position: consideration of spatial position
+        :param lag: lag radius (not used for 'active_acc' method)
         """
-        corr_df = self.get_correlation(method, position)
+        corr_df = self.get_correlation(method, position=position, lag=lag)
 
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
@@ -519,7 +549,7 @@ class MinianAnalysis:
         corr_df.to_csv(path.join(self.results_folder,
                                  f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.csv"))
 
-    def show_corr(self, threshold, method='signal', position=False):
+    def show_corr(self, threshold, method='signal', position=False, lag=0):
         """
         Function for plotting correlation distribution and map
         :param threshold: threshold for displayed correlation
@@ -529,8 +559,9 @@ class MinianAnalysis:
             active - Pearson correlation for binary segmentation of active states (depends on the chosen method for find_active_state)
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
         :param position: consideration of spatial position
+        :param lag: lag radius (not used for 'active_acc' method)
         """
-        corr_df = self.get_correlation(method, position)
+        corr_df = self.get_correlation(method, position=position, lag=lag)
 
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
 

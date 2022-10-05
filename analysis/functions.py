@@ -1,4 +1,5 @@
 import numpy as np
+import statsmodels.api as sm
 
 
 def corr_df_to_distribution(df):
@@ -33,3 +34,15 @@ def active_df_to_dict(df):
 
         d[col] = np.array_split(np.array(active.index.tolist()), idx.index.tolist())
     return d
+
+
+def crosscorr(signal1, signal2, lag=100):
+    """
+    Function for computing cross-correlation
+    :param signal1: signal 1
+    :param signal2: signal 2
+    :param lag: lag radius
+    :return: maximum correlation value
+    """
+    corr = list(sm.tsa.stattools.ccf(signal1, signal2)[:lag+1]) + list(sm.tsa.stattools.ccf(signal2, signal1)[1:lag+1])
+    return max(corr)
