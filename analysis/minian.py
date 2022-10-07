@@ -525,6 +525,9 @@ class MinianAnalysis:
         """
         Function for saving active states matrix to results folder (depends on the chosen method for find_active_state)
         """
+        if len(self.active_state_df) == 0:
+            raise Exception('Active states are not set!')
+
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
         self.active_state_df.astype(int).to_csv(

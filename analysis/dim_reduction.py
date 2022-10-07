@@ -12,6 +12,7 @@ from analysis.functions import active_df_to_dict, corr_df_to_distribution
 def iqr(x):
     return x.quantile(0.75) - x.quantile(0.25)
 
+
 class Data:
     def __init__(self,
                  path_to_data,
