@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from tqdm.notebook import tqdm
 
 from analysis.minian import MinianAnalysis
 from analysis.functions import active_df_to_dict, corr_df_to_distribution
@@ -16,18 +17,19 @@ def iqr(x):
 class Data:
     def __init__(self,
                  path_to_data,
-                 dates,
-                 fps,
-                 labels):
+                 sessions,
+                 verbose=False):
 
-        self.labels = labels
-        self.dates = dates
+        self.dates = sessions.keys()
         self.data = None
+        self.disable_verbose = not verbose
+        self.params = sessions
 
         self.models = {}
-        for date in dates:
-            ma = MinianAnalysis(f'{path_to_data}/{date}/minian/', fps)
-            ma.active_state_df = pd.read_csv(f'{path_to_data}/{date}/results/active_states_spike.csv',
+        for date in tqdm(self.dates, disable=self.disable_verbose):
+            session_path = self.params[date]["path"]
+            ma = MinianAnalysis(f'{path_to_data}/{session_path}/minian/', self.params[date]['fps'])
+            ma.active_state_df = pd.read_csv(f'{path_to_data}/{session_path}/results/active_states_spike.csv',
                                              index_col=0).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
 
@@ -38,7 +40,9 @@ class Data:
 
     def _get_burst_rate_data(self):
         df_br = pd.DataFrame()
-        for date in self.dates:
+        for date in tqdm(self.dates,
+                         disable=self.disable_verbose,
+                         desc='Step 1/6: Burst rate computing...'):
             df_ptr = pd.DataFrame()
             df_ptr['br'] = self.models[date].burst_rate()['activations per min']
             df_ptr['model'] = date
@@ -50,7 +54,9 @@ class Data:
 
     def _get_nsp_data(self):
         df_nsp = pd.DataFrame()
-        for date in self.dates:
+        for date in tqdm(self.dates,
+                         disable=self.disable_verbose,
+                         desc='Step 2/6: Network spike peak computing...'):
             df_ptr = pd.DataFrame()
             df_ptr['nsp'] = self.models[date].network_spike_peak(1).T['peak']
             df_ptr['model'] = date
@@ -62,7 +68,9 @@ class Data:
 
     def _get_nsr_data(self):
         df_nsr = pd.DataFrame()
-        for date in self.dates:
+        for date in tqdm(self.dates,
+                         disable=self.disable_verbose,
+                         desc='Step 3/6: Network spike rate computing...'):
             df_ptr = pd.DataFrame()
             df_ptr['nsr'] = self.models[date].network_spike_rate(1).T['spike rate']
             df_ptr['model'] = date
@@ -130,9 +138,10 @@ class Data:
         return df_conn
 
     def get_data(self):
-        df_nsr = self._get_nsr_data()
-        df_nsp = self._get_nsp_data()
+
         df_br = self._get_burst_rate_data()
+        df_nsp = self._get_nsp_data()
+        df_nsr = self._get_nsr_data()
 
         agg_functions = ['mean', 'std', 'max', 'min', np.ptp, iqr]
 
@@ -140,52 +149,44 @@ class Data:
         nsp = df_nsp.groupby('model').agg(agg_functions)
         br = df_br.groupby('model').agg(agg_functions)
 
-        df_corr_sign = self._get_corr_data('signal')
-        df_corr_diff = self._get_corr_data('diff')
-        df_corr_active = self._get_corr_data('active')
-        df_corr_active_acc = self._get_corr_data('active_acc')
+        corr_types = ['signal', 'diff', 'active', 'active_acc']
 
-        corr_sign = df_corr_sign.groupby('model').agg(agg_functions)
-        corr_diff = df_corr_diff.groupby('model').agg(agg_functions)
-        corr_active = df_corr_active.groupby('model').agg(agg_functions)
-        corr_active_acc = df_corr_active_acc.groupby('model').agg(agg_functions)
+        df_corr = {}
+        corrs = {}
+        for corr in tqdm(corr_types,
+                         disable=self.disable_verbose,
+                         desc='Step 4/6: Correlation computing...'):
+            df_corr[corr] = self._get_corr_data(corr)
+            corrs[corr] = df_corr[corr].groupby('model').agg(agg_functions)
 
-        df_network_degree_sign = self._get_nd_data(df_corr_sign, method='signal')
-        df_network_degree_diff = self._get_nd_data(df_corr_diff, method='diff')
-        df_network_degree_active = self._get_nd_data(df_corr_active, method='active')
-        df_network_degree_active_acc = self._get_nd_data(df_corr_active_acc, method='active_acc')
+        df_network_degree = {}
+        for corr in tqdm(corr_types,
+                         disable=self.disable_verbose,
+                         desc='Step 5/6: Network degree computing...'):
+            df_network_degree[corr] = self._get_nd_data(df_corr[corr], method=corr)
 
-        df_conn_sign = self._get_conn_data(df_corr_sign, 'signal')
-        df_conn_diff = self._get_conn_data(df_corr_diff, 'diff')
-        df_conn_active = self._get_conn_data(df_corr_active, 'active')
-        df_conn_active_acc = self._get_conn_data(df_corr_active_acc, 'active_acc')
-
-        conn = df_conn_sign.groupby('model').agg(agg_functions)
-        conn_diff = df_conn_diff.groupby('model').agg(agg_functions)
-        conn_act = df_conn_active.groupby('model').agg(agg_functions)
-        conn_act_acc = df_conn_active_acc.groupby('model').agg(agg_functions)
+        df_conn = {}
+        for corr in tqdm(corr_types,
+                         disable=self.disable_verbose,
+                         desc='Step 6/6: Connectivity computing...'):
+            df_conn[corr] = self._get_conn_data(df_corr[corr], corr)
+            df_conn[corr] = df_conn[corr].groupby('model').agg(agg_functions)
 
         data = nsp.join(nsr)
         data = data.join(br)
 
-        data = data.join(conn)
-        data = data.join(conn_diff)
-        data = data.join(conn_act)
-        data = data.join(conn_act_acc)
+        for corr in corr_types:
+            data = data.join(df_conn[corr])
 
-        data = data.join(corr_sign)
-        data = data.join(corr_diff)
-        data = data.join(corr_active)
-        data = data.join(corr_active_acc)
+        for corr in corr_types:
+            data = data.join(corrs[corr])
 
         data = data.T.set_index(data.columns.map('_'.join)).T
 
         data = data.reset_index()
 
-        data = data.merge(df_network_degree_sign.reset_index(), on='model')
-        data = data.merge(df_network_degree_diff.reset_index(), on='model')
-        data = data.merge(df_network_degree_active.reset_index(), on='model')
-        data = data.merge(df_network_degree_active_acc.reset_index(), on='model')
+        for corr in corr_types:
+            data = data.merge(df_network_degree[corr].reset_index(), on='model')
 
         data = data.set_index('model')
 
@@ -206,22 +207,32 @@ class Data:
             col = strong_corr.idxmax()
             data = data.drop(columns=[col])
 
+            if len(data.columns) <= 2:
+                continue
+
         return data
 
-    @staticmethod
-    def data_reduction(data, model=PCA(n_components=2, random_state=42)):
+    def data_reduction(self, data, model=PCA(n_components=2, random_state=42)):
         scaler = StandardScaler()
+
+        names = data.index
+        labels = [self.params[date]['label'] for date in names]
+
         data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-        data = model.fit_transform(data)
+        data_reduced = model.fit_transform(data)
 
-        return data, model
+        data_reduced = pd.DataFrame(data_reduced, columns=['x', 'y'])
+        data_reduced['label'] = labels
+        data_reduced['session'] = names
+
+        return data_reduced, model
 
     @staticmethod
-    def show_result(data, labels):
+    def show_result(data):
         plt.figure(figsize=(8, 6))
         plt.title('PCA', fontsize=18)
-        sns.scatterplot(data[:, 0], data[:, 1], hue=labels, s=120)
-        plt.legend(fontsize=16)
+        sns.scatterplot(data=data, x='x', y='y', hue='label', s=120)
+        plt.legend(fontsize=16, loc='center left', bbox_to_anchor=(1, 0.5))
         plt.tick_params(axis='both', labelsize=14)
         plt.show()
