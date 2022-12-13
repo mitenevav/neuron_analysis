@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from tqdm.notebook import tqdm
 
 from analysis.minian import MinianAnalysis
@@ -14,19 +15,28 @@ def iqr(x):
     return x.quantile(0.75) - x.quantile(0.25)
 
 
+def q95(x):
+    return x.quantile(0.95)
+
+
+def q5(x):
+    return x.quantile(0.05)
+
+
 class Data:
     def __init__(self,
                  path_to_data,
                  sessions,
                  verbose=False):
 
-        self.dates = sessions.keys()
+        self.sessions = sessions.keys()
         self.data = None
         self.disable_verbose = not verbose
         self.params = sessions
+        self.data_reduced = None
 
         self.models = {}
-        for date in tqdm(self.dates, disable=self.disable_verbose):
+        for date in tqdm(self.sessions, disable=self.disable_verbose):
             session_path = self.params[date]["path"]
             ma = MinianAnalysis(f'{path_to_data}/{session_path}/minian/', self.params[date]['fps'])
             ma.active_state_df = pd.read_csv(f'{path_to_data}/{session_path}/results/active_states_spike.csv',
@@ -40,7 +50,7 @@ class Data:
 
     def _get_burst_rate_data(self):
         df_br = pd.DataFrame()
-        for date in tqdm(self.dates,
+        for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
                          desc='Step 1/6: Burst rate computing...'):
             df_ptr = pd.DataFrame()
@@ -54,7 +64,7 @@ class Data:
 
     def _get_nsp_data(self):
         df_nsp = pd.DataFrame()
-        for date in tqdm(self.dates,
+        for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
                          desc='Step 2/6: Network spike peak computing...'):
             df_ptr = pd.DataFrame()
@@ -68,7 +78,7 @@ class Data:
 
     def _get_nsr_data(self):
         df_nsr = pd.DataFrame()
-        for date in tqdm(self.dates,
+        for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
                          desc='Step 3/6: Network spike rate computing...'):
             df_ptr = pd.DataFrame()
@@ -82,7 +92,7 @@ class Data:
 
     def _get_corr_data(self, method='signal'):
         df_corr = pd.DataFrame()
-        for date in self.dates:
+        for date in self.sessions:
             df_ptr = pd.DataFrame()
             df_ptr[f'corr_{method}'] = corr_df_to_distribution(self.models[date].get_correlation(method))
             df_ptr['model'] = date
@@ -103,7 +113,7 @@ class Data:
             thrs = [.1, .2, .3, .4, .5]
 
         df_network_degree = pd.DataFrame()
-        for date in self.dates:
+        for date in self.sessions:
             df_ptr = pd.DataFrame()
             corr = np.array(df_corr[df_corr['model'] == date][f'corr_{method}'])
             for thr in thrs:
@@ -126,7 +136,7 @@ class Data:
         total_distr = df_corr[f'corr_{method}'].dropna().tolist()
         thr = np.quantile(total_distr, q=q)
 
-        for date in self.dates:
+        for date in self.sessions:
             df_ptr = pd.DataFrame()
             corr_df = self.models[date].get_correlation(method)
             df_ptr[f'connectivity_{method}'] = ((corr_df > thr).sum() - 1) / len(corr_df)
@@ -143,13 +153,17 @@ class Data:
         df_nsp = self._get_nsp_data()
         df_nsr = self._get_nsr_data()
 
-        agg_functions = ['mean', 'std', 'max', 'min', np.ptp, iqr]
+        agg_functions = ['mean',
+                         'std',
+                         q95,
+                         q5,
+                         iqr]
 
         nsr = df_nsr.groupby('model').agg(agg_functions)
         nsp = df_nsp.groupby('model').agg(agg_functions)
         br = df_br.groupby('model').agg(agg_functions)
 
-        corr_types = ['signal', 'diff', 'active', 'active_acc']
+        corr_types = ['signal', 'diff', 'active']#, 'active_acc']
 
         df_corr = {}
         corrs = {}
@@ -194,45 +208,171 @@ class Data:
 
         self.data = data
 
-        return data
+        # return data
 
-    @staticmethod
-    def drop_strong_corr(data, thr=0.9):
+    def drop_strong_corr(self, thr=0.9):
 
-        while (data.corr() > thr).sum().sum() + (data.corr() < -thr).sum().sum() > len(data):
-            strong_corr = (data.corr() > thr).sum() + (data.corr() < -thr).sum()
+        while (self.data.corr() > thr).sum().sum() + (self.data.corr() < -thr).sum().sum() > len(self.data):
+            strong_corr = (self.data.corr() > thr).sum() + (self.data.corr() < -thr).sum()
             val = strong_corr.max()
             if val <= 1:
                 break
             col = strong_corr.idxmax()
-            data = data.drop(columns=[col])
+            self.data = self.data.drop(columns=[col])
 
-            if len(data.columns) <= 2:
+            if len(self.data.columns) <= 2:
                 continue
 
-        return data
+        # return self.data
 
-    def data_reduction(self, data, model=PCA(n_components=2, random_state=42)):
-        scaler = StandardScaler()
+    def data_reduction(self, model=PCA(n_components=2, random_state=42), scaler=StandardScaler()):
+        sessions = self.data.index
 
-        names = data.index
-        labels = [self.params[date]['label'] for date in names]
+        data = self.data.copy()
 
-        data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+        if scaler:
+            data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
         data_reduced = model.fit_transform(data)
 
         data_reduced = pd.DataFrame(data_reduced, columns=['x', 'y'])
-        data_reduced['label'] = labels
-        data_reduced['session'] = names
 
+        data_reduced['session'] = sessions
+        data_reduced['mouse'] = [self.params[session]['mouse'] for session in sessions]
+        data_reduced['condition'] = [self.params[session]['condition'] for session in sessions]
+
+        self.data_reduced = data_reduced
         return data_reduced, model
 
-    @staticmethod
-    def show_result(data):
-        plt.figure(figsize=(8, 6))
-        plt.title('PCA', fontsize=18)
-        sns.scatterplot(data=data, x='x', y='y', hue='label', s=120)
-        plt.legend(fontsize=16, loc='center left', bbox_to_anchor=(1, 0.5))
+    def show_result(self, mouse, condition_order=None):
+        if self.data_reduced is None:
+            data = self.data_reduction()[0]
+        else:
+            data = self.data_reduced.copy()
+
+        if condition_order is None:
+            condition_order = data['condition'].unique()
+
+        cmap = mcolors.LinearSegmentedColormap.from_list("", ["red", "yellow", "green"], len(condition_order))
+        palette = [cmap(i) for i in range(len(condition_order))]
+        palette = [palette[-1]] + palette[:-1]
+
+        palette_dict = {}
+        for cond, color in zip(condition_order, palette):
+            palette_dict[cond] = color
+
+        plt.figure(figsize=(9, 8))
+
+        data_mouse = data[data['mouse'] == mouse]
+        plt.title(f'Mouse {mouse}', fontsize=18)
+
+        sns.scatterplot(data=data_mouse,
+                        x='x', y='y',
+                        hue='condition',
+                        hue_order=condition_order,
+                        palette=palette_dict,
+                        s=120,
+                        zorder=2
+                        )
+
+        conditions = data_mouse['condition'].value_counts()
+        centers = data_mouse.groupby('condition').mean()
+
+        for cond in conditions[conditions > 1].index:
+            sns.scatterplot(x=[centers.loc[cond]['x']],
+                            y=[centers.loc[cond]['y']],
+                            label=f'{cond} mean',
+                            color=palette_dict[cond],
+                            marker='s',
+                            s=120,
+                            zorder=2
+                            )
+
+        xmin, xmax = plt.xlim()
+        ymin, ymax = plt.ylim()
+
+        d = max(xmax - xmin, ymax - ymin)
+        for start_cond, end_cond in zip(condition_order[:-1], condition_order[1:]):
+            plt.arrow(centers.loc[start_cond]['x'],
+                      centers.loc[start_cond]['y'],
+                      centers.loc[end_cond]['x'] - centers.loc[start_cond]['x'],
+                      centers.loc[end_cond]['y'] - centers.loc[start_cond]['y'],
+                      width=d * 0.0045,
+                      length_includes_head=True,
+                      color=palette_dict[end_cond],
+                      zorder=1
+                      )
+
         plt.tick_params(axis='both', labelsize=14)
+
         plt.show()
+
+    def show_stats_deviation(self, condition='all', topn=8):
+        if condition == 'all':
+            df = self.data.copy()
+        else:
+            df = self.data[[self.params[x]['condition'] == condition for x in self.data.index]]
+
+        df = pd.DataFrame(MinMaxScaler().fit_transform(df), columns=df.columns, index=df.index)
+
+        df['mouse'] = [self.params[session]['mouse'] for session in df.index]
+
+        if condition == 'all':
+            df['condition'] = [self.params[session]['condition'] for session in df.index]
+
+            df = df.groupby(['mouse', 'condition']).mean()
+            feat_std = df.reset_index().groupby('mouse').mad().mean().sort_values()
+        else:
+            df = df.groupby('mouse').mean()
+            feat_std = df.mad().sort_values()
+
+        plt.figure(figsize=(7, 6))
+        plt.barh(feat_std[:topn].index, feat_std[:topn])
+        plt.barh(feat_std[-topn:].index, feat_std[-topn:])
+        plt.show()
+
+    def show_stat(self, stat, condition='all'):
+        if condition == 'all':
+            df = self.data[[stat]]
+        else:
+            df = self.data[[self.params[x]['condition'] == condition for x in self.data.index]][[stat]]
+
+        df = pd.DataFrame(MinMaxScaler().fit_transform(df), columns=df.columns, index=df.index)
+
+        df['mouse'] = [self.params[session]['mouse'] for session in df.index]
+
+        if condition == 'all':
+            df['condition'] = [self.params[session]['condition'] for session in df.index]
+
+            df = df.groupby(['mouse', 'condition']).mean().reset_index()
+
+            fig, ax = plt.subplots(1, 2, figsize=(18, 8))
+
+            ax[0].set_title(stat)
+
+            sns.barplot(data=df,
+                        y=stat,
+                        x='mouse',
+                        ax=ax[0]
+                        )
+
+            sns.barplot(data=df,
+                        hue='condition',
+                        y=stat,
+                        x='mouse',
+                        ax=ax[1]
+                        )
+
+            plt.legend(loc='upper right')
+        else:
+            df = df.groupby('mouse').mean().reset_index()
+            sns.barplot(data=df,
+                        y=stat,
+                        x='mouse',
+                        )
+
+        plt.show()
+
+    def get_stat_list(self):
+        return self.data.columns.tolist()
+
