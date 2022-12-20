@@ -53,8 +53,8 @@ class MinianAnalysis:
     def __get_active_states(signal, threshold):
         """
         Function for determining the active states of the input signal
-        :param signal:
-        :param threshold:
+        :param signal: signal values
+        :param threshold: threshold for active state
         :return: list of lists with active states indexes
         """
         res = []
@@ -256,18 +256,11 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         step = period * self.fps
-
-        periods = pd.DataFrame()
-        for i in range(0, len(self.active_state_df), step):
-            ptr = []
-            for neuron in self.active_state_df:
-                ptr.append(True in self.active_state_df[neuron][i:i + step].tolist())
-
-            periods[i] = ptr
+        vals = self.active_state_df.values
 
         nsr = {}
-        for x in periods:
-            nsr[f'{x}-{x + step}'] = len(periods[x][periods[x] == True])
+        for i in range(0, len(self.active_state_df), step):
+            nsr[f'{i}-{i + step}'] = vals[i:i + step].any(axis=0).sum()
 
         nsr = pd.DataFrame(nsr, index=['spike rate'])
         nsr = nsr / len(self.active_state_df.columns) * 100
@@ -282,13 +275,10 @@ class MinianAnalysis:
         :param verbose: progressbar
         """
         spike_durations = []
-
+        vals = self.active_state_df.values
         for thr in tqdm(thresholds, disable=(not verbose)):
             percent_thr = len(self.active_state_df.columns) * thr / 100
-            duration = 0
-            for _, row in self.active_state_df.iterrows():
-                if len(row[row == True]) > percent_thr:
-                    duration += 1
+            duration = (vals.sum(axis=1) > percent_thr).sum()
             spike_durations.append(duration)
 
         nsd_df = pd.DataFrame({'percentage': thresholds,
@@ -303,14 +293,11 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         step = period * self.fps
+        vals = self.active_state_df.values
 
         spike_peaks = {}
-        for i in range(0, len(self.active_state_df), step):
-            peak = 0
-            for _, row in self.active_state_df[i:i + step].iterrows():
-                current_peak = len(row[row == True])
-                if current_peak > peak:
-                    peak = current_peak
+        for i in range(0, len(vals), step):
+            peak = vals[i:i+step].sum(axis=1).max()
 
             spike_peaks[f'{i}-{i + step}'] = peak
 
@@ -451,17 +438,18 @@ class MinianAnalysis:
         """
         spike_acc = np.ones((self.active_state_df.shape[1], self.active_state_df.shape[1]))
         columns = self.active_state_df.columns.tolist()
+        vals = self.active_state_df.values.T
 
-        for i, col1 in enumerate(columns):
-            if self.active_state_df[col1].sum() == 0:
+        for i, x in enumerate(vals):
+            if x.sum() == 0:
                 spike_acc[i, :] = 0
                 spike_acc[:, i] = 0
                 spike_acc[i, i] = 1
                 continue
 
-            for j, col2 in enumerate(columns[i + 1:]):
-                intersec = (self.active_state_df[col1] & self.active_state_df[col2]).sum()
-                union = (self.active_state_df[col1] | self.active_state_df[col2]).sum()
+            for j, y in enumerate(vals[i + 1:]):
+                intersec = (x & y).sum()
+                union = (x | y).sum()
 
                 spike_acc[i, i + j + 1] = intersec / union
                 spike_acc[i + j + 1, i] = intersec / union
@@ -527,7 +515,7 @@ class MinianAnalysis:
         """
         if len(self.active_state_df) == 0:
             raise Exception('Active states are not set!')
-
+        
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
         self.active_state_df.astype(int).to_csv(

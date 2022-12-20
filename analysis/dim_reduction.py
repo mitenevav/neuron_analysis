@@ -11,23 +11,25 @@ from analysis.minian import MinianAnalysis
 from analysis.functions import active_df_to_dict, corr_df_to_distribution
 
 
-def iqr(x):
-    return x.quantile(0.75) - x.quantile(0.25)
-
-
-def q95(x):
-    return x.quantile(0.95)
-
-
-def q5(x):
-    return x.quantile(0.05)
-
-
 class Data:
     def __init__(self,
                  path_to_data,
                  sessions,
                  verbose=False):
+        """
+        Initialising function
+        :param path_to_data: path to data folder
+        :param sessions: dict with information about sessions
+                        {session 1:
+                            {'path': path to session folder,
+                             'mouse': mouse id,
+                             'condition': condition of session,
+                             'fps': fps of session},
+                         session 2: ...
+                         }
+
+        :param verbose: progressbar
+        """
 
         self.sessions = sessions.keys()
         self.data = None
@@ -49,6 +51,10 @@ class Data:
             self.models[date] = ma
 
     def _get_burst_rate_data(self):
+        """
+        Function for collecting burst rate data
+        :return: burst rate data
+        """
         df_br = pd.DataFrame()
         for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
@@ -63,6 +69,10 @@ class Data:
         return df_br
 
     def _get_nsp_data(self):
+        """
+        Function for collecting network spike peak data
+        :return: network spike peak data
+        """
         df_nsp = pd.DataFrame()
         for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
@@ -77,6 +87,10 @@ class Data:
         return df_nsp
 
     def _get_nsr_data(self):
+        """
+        Function for collecting network spike rate data
+        :return: network spike rate data
+        """
         df_nsr = pd.DataFrame()
         for date in tqdm(self.sessions,
                          disable=self.disable_verbose,
@@ -91,6 +105,11 @@ class Data:
         return df_nsr
 
     def _get_corr_data(self, method='signal'):
+        """
+        Function for collecting correlation data
+        :param method: method of correlation
+        :return: DataFrame with correlation distribution
+        """
         df_corr = pd.DataFrame()
         for date in self.sessions:
             df_ptr = pd.DataFrame()
@@ -108,6 +127,14 @@ class Data:
                      method='signal',
                      thrs=None,
                      ):
+        """
+        Function for collecting 'network degree' data
+        Network degree - share of strong network connections
+        :param df_corr: DataFrame with correlation distribution
+        :param method: method of correlation
+        :param thrs: list of thresholds for strong correlation between neurons
+        :return: network degree data
+        """
 
         if thrs is None:
             thrs = [.1, .2, .3, .4, .5]
@@ -131,6 +158,14 @@ class Data:
                        df_corr,
                        method='signal',
                        q=0.9):
+        """
+        Function for collecting 'connectivity' data
+        Connectivity - share of strong connections for each neuron
+        :param df_corr: DataFrame with correlation distribution
+        :param method: method of correlation
+        :param q: threshold for strong correlation between neurons
+        :return: connectivity data
+        """
         df_conn = pd.DataFrame()
 
         total_distr = df_corr[f'corr_{method}'].dropna().tolist()
@@ -148,6 +183,9 @@ class Data:
         return df_conn
 
     def get_data(self):
+        """
+        Function for collecting all data
+        """
 
         df_br = self._get_burst_rate_data()
         df_nsp = self._get_nsp_data()
@@ -163,7 +201,7 @@ class Data:
         nsp = df_nsp.groupby('model').agg(agg_functions)
         br = df_br.groupby('model').agg(agg_functions)
 
-        corr_types = ['signal', 'diff', 'active']#, 'active_acc']
+        corr_types = ['signal', 'diff', 'active', 'active_acc']
 
         df_corr = {}
         corrs = {}
@@ -208,10 +246,11 @@ class Data:
 
         self.data = data
 
-        # return data
-
     def drop_strong_corr(self, thr=0.9):
-
+        """
+        Function for drop strong correlation statistics
+        :param thr: threshold for dropping
+        """
         while (self.data.corr() > thr).sum().sum() + (self.data.corr() < -thr).sum().sum() > len(self.data):
             strong_corr = (self.data.corr() > thr).sum() + (self.data.corr() < -thr).sum()
             val = strong_corr.max()
@@ -223,9 +262,13 @@ class Data:
             if len(self.data.columns) <= 2:
                 continue
 
-        # return self.data
-
     def data_reduction(self, model=PCA(n_components=2, random_state=42), scaler=StandardScaler()):
+        """
+        Function for data reduction
+        :param model: reduction model using 'fit_transform' method
+        :param scaler: scaling model using 'fit_transform' method
+        :return: reduced data
+        """
         sessions = self.data.index
 
         data = self.data.copy()
@@ -245,6 +288,11 @@ class Data:
         return data_reduced, model
 
     def show_result(self, mouse, condition_order=None):
+        """
+        Function for plotting result after data reduction
+        :param mouse: mouse for plotting
+        :param condition_order: order of conditions in time
+        """
         if self.data_reduced is None:
             data = self.data_reduction()[0]
         else:
@@ -308,6 +356,11 @@ class Data:
         plt.show()
 
     def show_stats_deviation(self, condition='all', topn=8):
+        """
+        Function for plotting deviation of statistics
+        :param condition: {'all' or specific condition} condition for plotting
+        :param topn: number of statistics for plotting
+        """
         if condition == 'all':
             df = self.data.copy()
         else:
@@ -332,6 +385,12 @@ class Data:
         plt.show()
 
     def show_stat(self, stat, condition='all'):
+        """
+        Function for plotting bars with information about statistic
+        :param stat: statistic for plotting
+        :param condition: {'all' or specific condition} condition for plotting
+        """
+
         if condition == 'all':
             df = self.data[[stat]]
         else:
@@ -374,5 +433,36 @@ class Data:
         plt.show()
 
     def get_stat_list(self):
+        """
+        Function for getting list of statistics
+        :return: list of statistics
+        """
         return self.data.columns.tolist()
+
+
+def iqr(x):
+    """
+    Function for computing interquartile range
+    :param x: pd.Series with data
+    :return: interquartile range
+    """
+    return x.quantile(0.75) - x.quantile(0.25)
+
+
+def q95(x):
+    """
+    Function for computing 95-quantile
+    :param x: pd.Series with data
+    :return: 95-quantile
+    """
+    return x.quantile(0.95)
+
+
+def q5(x):
+    """
+    Function for computing 5-quantile
+    :param x: pd.Series with data
+    :return: 5-quantile
+    """
+    return x.quantile(0.05)
 
