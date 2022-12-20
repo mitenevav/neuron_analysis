@@ -7,6 +7,7 @@ from tqdm.notebook import tqdm
 from scipy import ndimage
 from os import path, mkdir
 from analysis.functions import crosscorr
+
 sns.set(color_codes=True)
 
 
@@ -18,6 +19,7 @@ class MinianAnalysis:
     * calculation of statistics
     * visualisation
     """
+
     def __init__(self, path_to_data, fps, path_to_results=None):
         """
         Initialization function
@@ -26,16 +28,25 @@ class MinianAnalysis:
         :path_to_results: path to folder for results
         """
         if path_to_results is None:
-            path_to_results = path_to_data + '../results'
-        signals = zarr.open_group(path_to_data + 'C.zarr')
-        self.signals = pd.DataFrame(signals.C).set_index(pd.DataFrame(signals.unit_id)[0].rename('unit_id')).T
+            path_to_results = path_to_data + "../results"
+        signals = zarr.open_group(path_to_data + "C.zarr")
+        self.signals = (
+            pd.DataFrame(signals.C)
+            .set_index(pd.DataFrame(signals.unit_id)[0].rename("unit_id"))
+            .T
+        )
 
-        positions = zarr.open_group(path_to_data + 'A.zarr')
-        positions_centers = np.array([ndimage.measurements.center_of_mass(x) for x in np.array(positions.A)])
-        self.positions = pd.DataFrame({'unit_id': positions.unit_id,
-                                       'x': positions_centers[:, 0],
-                                       'y': positions_centers[:, 1],
-                                       }).set_index('unit_id')
+        positions = zarr.open_group(path_to_data + "A.zarr")
+        positions_centers = np.array(
+            [ndimage.measurements.center_of_mass(x) for x in np.array(positions.A)]
+        )
+        self.positions = pd.DataFrame(
+            {
+                "unit_id": positions.unit_id,
+                "x": positions_centers[:, 0],
+                "y": positions_centers[:, 1],
+            }
+        ).set_index("unit_id")
 
         self.fps = fps
 
@@ -59,29 +70,31 @@ class MinianAnalysis:
         """
         res = []
         sleep = signal[signal <= threshold].reset_index()
-        sleep_min = sleep['index'].min()
+        sleep_min = sleep["index"].min()
 
         if len(sleep) == 0:
-            return [np.arange(0, len(signal), dtype='int').tolist()]
+            return [np.arange(0, len(signal), dtype="int").tolist()]
         elif sleep_min > 0:
             # res.append(np.arange(0, sleep_min + 1, dtype='int').tolist())
-            res.append(np.arange(0, sleep_min, dtype='int').tolist())
+            res.append(np.arange(0, sleep_min, dtype="int").tolist())
 
-        sleep['index_diff'] = sleep['index'].diff()
+        sleep["index_diff"] = sleep["index"].diff()
 
-        changes = sleep[sleep['index_diff'] > 1].copy()
+        changes = sleep[sleep["index_diff"] > 1].copy()
 
         if len(changes) == 0:
             return res
 
-        changes['start'] = changes['index'] - changes['index_diff'] + 1
-        changes['end'] = changes['index']  # + 1
+        changes["start"] = changes["index"] - changes["index_diff"] + 1
+        changes["end"] = changes["index"]  # + 1
 
-        res += changes.apply(lambda x: np.arange(x['start'], x['end'], dtype='int').tolist(), axis=1).tolist()
+        res += changes.apply(
+            lambda x: np.arange(x["start"], x["end"], dtype="int").tolist(), axis=1
+        ).tolist()
 
-        sleep_max = sleep['index'].max() + 1
+        sleep_max = sleep["index"].max() + 1
         if sleep_max < len(signal):
-            res.append(np.arange(sleep_max, len(signal), dtype='int').tolist())
+            res.append(np.arange(sleep_max, len(signal), dtype="int").tolist())
         return res
 
     @staticmethod
@@ -101,9 +114,11 @@ class MinianAnalysis:
         for i in range(1, len(peaks_idx)):
             gap = peaks_idx[i][0] - new_peaks[-1][-1]
             if gap <= warm:
-                new_peaks[-1] = (new_peaks[-1] +
-                                 [i for i in range(new_peaks[-1][-1] + 1, peaks_idx[i][0])] +
-                                 peaks_idx[i])
+                new_peaks[-1] = (
+                    new_peaks[-1]
+                    + [i for i in range(new_peaks[-1][-1] + 1, peaks_idx[i][0])]
+                    + peaks_idx[i]
+                )
             else:
                 new_peaks.append(peaks_idx[i])
 
@@ -114,7 +129,7 @@ class MinianAnalysis:
 
         return peaks
 
-    def find_active_state(self, window, cold, warm, method='spike', verbose=True):
+    def find_active_state(self, window, cold, warm, method="spike", verbose=True):
         """
         Function for preprocessing signals and determining the active states
         :param window: size of the moving window for smoothing
@@ -128,7 +143,9 @@ class MinianAnalysis:
         self.type_of_activity = method
 
         # rolling mean
-        self.smooth_signals = self.signals.rolling(window=window, center=True, min_periods=0).mean()
+        self.smooth_signals = self.signals.rolling(
+            window=window, center=True, min_periods=0
+        ).mean()
 
         # derivative
         self.diff = self.signals.diff()[1:].reset_index(drop=True)
@@ -143,7 +160,7 @@ class MinianAnalysis:
             threshold_pos = np.median(y_pos) + mad_pos
             peaks_pos_idx = self.__get_active_states(y, threshold_pos)
 
-            if method == 'full':
+            if method == "full":
                 y_neg = -y[y <= 0]
                 mad_neg = np.mean(np.abs(np.median(y_neg) - y_neg))
                 threshold_neg = np.median(y_neg) + mad_neg
@@ -151,7 +168,9 @@ class MinianAnalysis:
             else:
                 peaks_neg_idx = []
 
-            peaks_idx = self.__get_peaks(peaks_pos_idx, peaks_neg_idx, cold=cold, warm=warm)
+            peaks_idx = self.__get_peaks(
+                peaks_pos_idx, peaks_neg_idx, cold=cold, warm=warm
+            )
 
             self.active_state[num] = peaks_idx
 
@@ -160,18 +179,18 @@ class MinianAnalysis:
                 signal = self.signals[num]
 
                 plt.figure(figsize=(15, 10))
-                plt.title(f'Neuron {num}', fontsize=18)
+                plt.title(f"Neuron {num}", fontsize=18)
 
-                plt.plot(signal, label='sleep')
+                plt.plot(signal, label="sleep")
                 for peak in peaks_idx:
-                    plt.plot(signal.iloc[peak], c='r')
+                    plt.plot(signal.iloc[peak], c="r")
 
                 if len(peaks_idx) > 0:
-                    plt.plot(signal.iloc[peaks_idx[0]], c='r', label='active')
+                    plt.plot(signal.iloc[peaks_idx[0]], c="r", label="active")
 
-                plt.plot(range(len(signal)), [0] * len(signal), c='b', lw=3)
+                plt.plot(range(len(signal)), [0] * len(signal), c="b", lw=3)
                 for peak in peaks_idx:
-                    plt.plot(peak, [0] * len(peak), c='r', lw=3)
+                    plt.plot(peak, [0] * len(peak), c="r", lw=3)
 
                 plt.legend(fontsize=18)
                 plt.show()
@@ -181,7 +200,7 @@ class MinianAnalysis:
             for peak in self.active_state[neuron]:
                 self.active_state_df[neuron].iloc[peak] = True
 
-    def get_active_state(self, neuron, window, cold, warm, method='spike'):
+    def get_active_state(self, neuron, window, cold, warm, method="spike"):
         """
         Function for preprocessing neuron signal and determining the active states
         :param neuron: neuron number
@@ -205,7 +224,7 @@ class MinianAnalysis:
         threshold_pos = np.median(y_pos) + mad_pos
         peaks_pos_idx = self.__get_active_states(smooth_diff, threshold_pos)
 
-        if method == 'full':
+        if method == "full":
             y_neg = -smooth_diff[smooth_diff <= 0]
             mad_neg = np.mean(np.abs(np.median(y_neg) - y_neg))
             threshold_neg = np.median(y_neg) + mad_neg
@@ -216,18 +235,18 @@ class MinianAnalysis:
         peaks_idx = self.__get_peaks(peaks_pos_idx, peaks_neg_idx, cold=cold, warm=warm)
 
         plt.figure(figsize=(15, 10))
-        plt.title(f'Neuron {neuron}', fontsize=22)
+        plt.title(f"Neuron {neuron}", fontsize=22)
 
-        plt.plot(signal, label='sleep', c='b', lw=4)
+        plt.plot(signal, label="sleep", c="b", lw=4)
         for peak in peaks_idx:
-            plt.plot(signal.iloc[peak], c='r', lw=4)
+            plt.plot(signal.iloc[peak], c="r", lw=4)
 
         if len(peaks_idx) > 0:
-            plt.plot(signal.iloc[peaks_idx[0]], c='r', label='active', lw=4)
+            plt.plot(signal.iloc[peaks_idx[0]], c="r", label="active", lw=4)
 
-        plt.plot(range(len(signal)), [0] * len(signal), c='b', lw=5)
+        plt.plot(range(len(signal)), [0] * len(signal), c="b", lw=5)
         for peak in peaks_idx:
-            plt.plot(peak, [0] * len(peak), c='r', lw=5)
+            plt.plot(peak, [0] * len(peak), c="r", lw=5)
 
         plt.legend(fontsize=20)
         plt.show()
@@ -241,11 +260,13 @@ class MinianAnalysis:
         for neuron in self.active_state:
             num_of_activations.append(len(self.active_state[neuron]))
 
-        burst_rate = pd.DataFrame({'num_of_activations': num_of_activations})
+        burst_rate = pd.DataFrame({"num_of_activations": num_of_activations})
 
-        burst_rate['activations per min'] = burst_rate['num_of_activations'] / len(self.active_state_df) * self.fps * 60
+        burst_rate["activations per min"] = (
+            burst_rate["num_of_activations"] / len(self.active_state_df) * self.fps * 60
+        )
 
-        burst_rate['activations per min'] = burst_rate['activations per min'].round(2)
+        burst_rate["activations per min"] = burst_rate["activations per min"].round(2)
 
         return burst_rate
 
@@ -260,9 +281,9 @@ class MinianAnalysis:
 
         nsr = {}
         for i in range(0, len(self.active_state_df), step):
-            nsr[f'{i}-{i + step}'] = vals[i:i + step].any(axis=0).sum()
+            nsr[f"{i}-{i + step}"] = vals[i : i + step].any(axis=0).sum()
 
-        nsr = pd.DataFrame(nsr, index=['spike rate'])
+        nsr = pd.DataFrame(nsr, index=["spike rate"])
         nsr = nsr / len(self.active_state_df.columns) * 100
 
         return nsr
@@ -281,9 +302,12 @@ class MinianAnalysis:
             duration = (vals.sum(axis=1) > percent_thr).sum()
             spike_durations.append(duration)
 
-        nsd_df = pd.DataFrame({'percentage': thresholds,
-                               'Network spike duration': np.array(spike_durations) / self.fps
-                               })
+        nsd_df = pd.DataFrame(
+            {
+                "percentage": thresholds,
+                "Network spike duration": np.array(spike_durations) / self.fps,
+            }
+        )
         return nsd_df
 
     def network_spike_peak(self, period):
@@ -297,11 +321,11 @@ class MinianAnalysis:
 
         spike_peaks = {}
         for i in range(0, len(vals), step):
-            peak = vals[i:i+step].sum(axis=1).max()
+            peak = vals[i : i + step].sum(axis=1).max()
 
-            spike_peaks[f'{i}-{i + step}'] = peak
+            spike_peaks[f"{i}-{i + step}"] = peak
 
-        nsp_df = pd.DataFrame(spike_peaks, index=['peak'])
+        nsp_df = pd.DataFrame(spike_peaks, index=["peak"])
         nsp_df = nsp_df / len(self.active_state_df.columns) * 100
 
         return nsp_df
@@ -315,23 +339,25 @@ class MinianAnalysis:
         burst_rate = self.burst_rate()
 
         plt.figure(figsize=(8, 6))
-        plt.title('Burst rate', fontsize=17)
+        plt.title("Burst rate", fontsize=17)
 
-        if burst_rate['activations per min'].nunique() > max_bins:
-            sns.histplot(data=burst_rate, x='activations per min', bins=max_bins, stat='percent')
+        if burst_rate["activations per min"].nunique() > max_bins:
+            sns.histplot(
+                data=burst_rate, x="activations per min", bins=max_bins, stat="percent"
+            )
         else:
             burst_rate = (
-                burst_rate['activations per min']
-                    .value_counts(normalize=True)
-                    .mul(100)
-                    .rename('percent')
-                    .reset_index()
-                    .rename(columns={'index': 'activations per min'})
+                burst_rate["activations per min"]
+                .value_counts(normalize=True)
+                .mul(100)
+                .rename("percent")
+                .reset_index()
+                .rename(columns={"index": "activations per min"})
             )
-            sns.barplot(data=burst_rate, x='activations per min', y='percent')
+            sns.barplot(data=burst_rate, x="activations per min", y="percent")
 
-        plt.xlabel('activations per min', fontsize=16)
-        plt.ylabel('percent', fontsize=16)
+        plt.xlabel("activations per min", fontsize=16)
+        plt.ylabel("percent", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -344,10 +370,10 @@ class MinianAnalysis:
         """
         nsr = self.network_spike_rate(period)
         plt.figure(figsize=(8, 6))
-        plt.title('Network spike rate', fontsize=17)
-        sns.histplot(data=nsr.T, x='spike rate', stat='percent')
-        plt.xlabel(f'percentage of active neurons per {period} second', fontsize=16)
-        plt.ylabel('percent', fontsize=16)
+        plt.title("Network spike rate", fontsize=17)
+        sns.histplot(data=nsr.T, x="spike rate", stat="percent")
+        plt.xlabel(f"percentage of active neurons per {period} second", fontsize=16)
+        plt.ylabel("percent", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -360,10 +386,10 @@ class MinianAnalysis:
         """
         nsd_df = self.network_spike_duration(thresholds)
         plt.figure(figsize=(8, 6))
-        plt.title('Network spike duration', fontsize=17)
-        sns.barplot(data=nsd_df, x='percentage', y='Network spike duration')
-        plt.xlabel('percentage of active neurons', fontsize=16)
-        plt.ylabel('seconds', fontsize=16)
+        plt.title("Network spike duration", fontsize=17)
+        sns.barplot(data=nsd_df, x="percentage", y="Network spike duration")
+        plt.xlabel("percentage of active neurons", fontsize=16)
+        plt.ylabel("seconds", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -376,10 +402,10 @@ class MinianAnalysis:
         """
         nsp_df = self.network_spike_peak(period)
         plt.figure(figsize=(8, 6))
-        plt.title('Network spike peak', fontsize=17)
-        sns.histplot(data=nsp_df.T, x='peak', bins=8, stat='percent')
-        plt.xlabel(f'max percentage of active neurons per {period} second', fontsize=16)
-        plt.ylabel('percent', fontsize=16)
+        plt.title("Network spike peak", fontsize=17)
+        sns.histplot(data=nsp_df.T, x="peak", bins=8, stat="percent")
+        plt.xlabel(f"max percentage of active neurons per {period} second", fontsize=16)
+        plt.ylabel("percent", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -390,7 +416,7 @@ class MinianAnalysis:
         Burst rate - number of cell activations per minute
         """
         burst_rate = self.burst_rate()
-        burst_rate.to_csv(self.results_folder + '/burst_rate.csv')
+        burst_rate.to_csv(self.results_folder + "/burst_rate.csv")
 
     def save_network_spike_rate(self, period):
         """
@@ -399,7 +425,7 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         nsr = self.network_spike_rate(period)
-        nsr.to_csv(self.results_folder + '/network_spike_rate.csv')
+        nsr.to_csv(self.results_folder + "/network_spike_rate.csv")
 
     def save_network_spike_duration(self, thresholds):
         """
@@ -408,7 +434,7 @@ class MinianAnalysis:
         :param thresholds: threshold values in percentages
         """
         nsd_df = self.network_spike_duration(thresholds)
-        nsd_df.to_csv(self.results_folder + '/network_spike_duration.csv')
+        nsd_df.to_csv(self.results_folder + "/network_spike_duration.csv")
 
     def save_network_spike_peak(self, period):
         """
@@ -417,7 +443,7 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         nsp_df = self.network_spike_peak(period)
-        nsp_df.to_csv(self.results_folder + '/network_spike_peak.csv')
+        nsp_df.to_csv(self.results_folder + "/network_spike_peak.csv")
 
     def compute_nzsfi(self):
         """
@@ -426,8 +452,11 @@ class MinianAnalysis:
         """
         nzsfi = pd.DataFrame(columns=self.active_state_df.columns)
         for i in self.active_state_df:
-            nzsfi[i] = [self.active_state_df[i].sum() / (self.active_state_df[i] & self.active_state_df[j]).sum() for j
-                        in self.active_state_df]
+            nzsfi[i] = [
+                self.active_state_df[i].sum()
+                / (self.active_state_df[i] & self.active_state_df[j]).sum()
+                for j in self.active_state_df
+            ]
 
         return nzsfi.T
 
@@ -436,7 +465,9 @@ class MinianAnalysis:
         Function for computing spike accuracy (intersection / union)
         :return: FataFrame with spike accuracy
         """
-        spike_acc = np.ones((self.active_state_df.shape[1], self.active_state_df.shape[1]))
+        spike_acc = np.ones(
+            (self.active_state_df.shape[1], self.active_state_df.shape[1])
+        )
         columns = self.active_state_df.columns.tolist()
         vals = self.active_state_df.values.T
 
@@ -447,14 +478,16 @@ class MinianAnalysis:
                 spike_acc[i, i] = 1
                 continue
 
-            for j, y in enumerate(vals[i + 1:]):
+            for j, y in enumerate(vals[i + 1 :]):
                 intersec = (x & y).sum()
                 union = (x | y).sum()
 
                 spike_acc[i, i + j + 1] = intersec / union
                 spike_acc[i + j + 1, i] = intersec / union
 
-        return pd.DataFrame(spike_acc).set_axis(columns, axis=0).set_axis(columns, axis=1)
+        return (
+            pd.DataFrame(spike_acc).set_axis(columns, axis=0).set_axis(columns, axis=1)
+        )
 
     def compute_cross_correlation(self, data, lag=0):
         """
@@ -476,7 +509,7 @@ class MinianAnalysis:
 
         return cross_corr_df
 
-    def get_correlation(self, method='signal', position=False, lag=0):
+    def get_correlation(self, method="signal", position=False, lag=0):
         """
         Function for computing correlation
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -487,25 +520,31 @@ class MinianAnalysis:
         :param position: consideration of spatial position
         :param lag: lag radius (not used for 'active_acc' method)
         """
-        if method == 'signal':
+        if method == "signal":
             corr_df = self.compute_cross_correlation(self.signals, lag)
-        elif method == 'diff':
+        elif method == "diff":
             corr_df = self.compute_cross_correlation(self.smooth_diff, lag)
-        elif method == 'active':
+        elif method == "active":
             corr_df = self.compute_cross_correlation(self.active_state_df, lag)
-        elif method == 'active_acc':
+        elif method == "active_acc":
             corr_df = self.compute_spike_accuracy()
         else:
-            print(f'Method {method} is not supported!')
+            print(f"Method {method} is not supported!")
             return
 
         if position:
             distances = self.positions.apply(
-                lambda x: ((self.positions['x'] - x['x']) ** 2 + (self.positions['y'] - x['y']) ** 2) ** (1 / 2),
-                axis=1
+                lambda x: (
+                    (self.positions["x"] - x["x"]) ** 2
+                    + (self.positions["y"] - x["y"]) ** 2
+                )
+                ** (1 / 2),
+                axis=1,
             )
 
-            corr_df = (1 - 100 / (distances + 100)) * corr_df.values  # 100 is 25% of distance
+            corr_df = (
+                1 - 100 / (distances + 100)
+            ) * corr_df.values  # 100 is 25% of distance
 
         return corr_df
 
@@ -514,14 +553,15 @@ class MinianAnalysis:
         Function for saving active states matrix to results folder (depends on the chosen method for find_active_state)
         """
         if len(self.active_state_df) == 0:
-            raise Exception('Active states are not set!')
-        
+            raise Exception("Active states are not set!")
+
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
         self.active_state_df.astype(int).to_csv(
-            path.join(self.results_folder, f'active_states_{self.type_of_activity}.csv'))
+            path.join(self.results_folder, f"active_states_{self.type_of_activity}.csv")
+        )
 
-    def save_correlation_matrix(self, method='signal', position=False, lag=0):
+    def save_correlation_matrix(self, method="signal", position=False, lag=0):
         """
         Function for saving correlation matrix to results folder
         :param method: ['signal', 'diff', 'active', 'active_acc'] type of correlated sequences
@@ -537,10 +577,14 @@ class MinianAnalysis:
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
 
-        corr_df.to_csv(path.join(self.results_folder,
-                                 f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.csv"))
+        corr_df.to_csv(
+            path.join(
+                self.results_folder,
+                f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.csv",
+            )
+        )
 
-    def show_corr(self, threshold, method='signal', position=False, lag=0):
+    def show_corr(self, threshold, method="signal", position=False, lag=0):
         """
         Function for plotting correlation distribution and map
         :param threshold: threshold for displayed correlation
@@ -564,28 +608,34 @@ class MinianAnalysis:
 
             c += 1
 
-        sns.histplot(corr, stat='percent', ax=ax[0])
-        ax[0].set_ylabel('percent', fontsize=20)
-        ax[0].set_title(f'Correlation distribution for {method} method', fontsize=24)
+        sns.histplot(corr, stat="percent", ax=ax[0])
+        ax[0].set_ylabel("percent", fontsize=20)
+        ax[0].set_title(f"Correlation distribution for {method} method", fontsize=24)
 
         corr_df = corr_df[(corr_df > threshold) & (corr_df.abs() < 1)]
-        corr_df.dropna(axis=0, how='all', inplace=True)
-        corr_df.dropna(axis=1, how='all', inplace=True)
+        corr_df.dropna(axis=0, how="all", inplace=True)
+        corr_df.dropna(axis=1, how="all", inplace=True)
 
-        ax[1].set_title(f'Correlation map for {method} method', fontsize=24)
+        ax[1].set_title(f"Correlation map for {method} method", fontsize=24)
 
         c = 0
         for i, row in corr_df.iterrows():
             for j in corr_df.columns.tolist()[c:]:
                 if not np.isnan(row[j]):
                     ax[1].plot(
-                        self.positions.loc[[i, j]]['y'], self.positions.loc[[i, j]]['x'],
-                        color='r',
+                        self.positions.loc[[i, j]]["y"],
+                        self.positions.loc[[i, j]]["x"],
+                        color="r",
                         lw=0.5 + (row[j] - threshold) / (1 - threshold) * 4,
                     )
 
-            ax[1].scatter(x=self.positions.loc[i]['y'], y=self.positions.loc[i]['x'], color='w', zorder=5)
+            ax[1].scatter(
+                x=self.positions.loc[i]["y"],
+                y=self.positions.loc[i]["x"],
+                color="w",
+                zorder=5,
+            )
             c += 1
 
-        ax[1].scatter(x=self.positions['y'], y=self.positions['x'], s=100, zorder=4)
+        ax[1].scatter(x=self.positions["y"], y=self.positions["x"], s=100, zorder=4)
         plt.show()

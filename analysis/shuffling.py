@@ -14,12 +14,8 @@ class ShuffleAnalysis:
     """
     Class for randomly shuffling neuron activity
     """
-    def __init__(self,
-                 path_to_data,
-                 dates,
-                 fps,
-                 shuffle_fraction=1.,
-                 verbose=True):
+
+    def __init__(self, path_to_data, dates, fps, shuffle_fraction=1.0, verbose=True):
         """
         Initialization function
         :param path_to_data: path to directory with sessions folders
@@ -38,17 +34,21 @@ class ShuffleAnalysis:
         self.shuffled_data = {}
 
         for date in tqdm(self.dates, disable=(not self.verbose)):
-            ma_o = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
-            ma_o.active_state_df = pd.read_csv(f'{self.path_to_data}/{date}/results/active_states_spike.csv',
-                                               index_col=0).astype(bool)
+            ma_o = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", self.fps)
+            ma_o.active_state_df = pd.read_csv(
+                f"{self.path_to_data}/{date}/results/active_states_spike.csv",
+                index_col=0,
+            ).astype(bool)
 
             ma_o.active_state = active_df_to_dict(ma_o.active_state_df)
 
-            ma_s = MinianAnalysis(f'{self.path_to_data}/{date}/minian/', self.fps)
+            ma_s = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", self.fps)
 
             ma_s.active_state_df = ma_o.active_state_df.copy()
             idx = ma_s.active_state_df.sample(axis=1, frac=shuffle_fraction).columns
-            ma_s.active_state_df[idx] = ma_s.active_state_df[idx].apply(self.shuffle_signal).astype(bool)
+            ma_s.active_state_df[idx] = (
+                ma_s.active_state_df[idx].apply(self.shuffle_signal).astype(bool)
+            )
             ma_s.active_state = active_df_to_dict(ma_s.active_state_df)
 
             self.original_data[date] = ma_o
@@ -65,28 +65,32 @@ class ShuffleAnalysis:
 
         active_states = []
         sleep = signal[signal == 0].reset_index()
-        sleep_min = sleep['index'].min()
+        sleep_min = sleep["index"].min()
 
         if len(sleep) == 0:
-            active_states += [np.arange(0, len(signal), dtype='int').tolist()]
+            active_states += [np.arange(0, len(signal), dtype="int").tolist()]
         else:
             if sleep_min > 0:
-                active_states.append(np.arange(0, sleep_min, dtype='int').tolist())
+                active_states.append(np.arange(0, sleep_min, dtype="int").tolist())
 
-            sleep['index_diff'] = sleep['index'].diff()
+            sleep["index_diff"] = sleep["index"].diff()
 
-            changes = sleep[sleep['index_diff'] > 1].copy()
+            changes = sleep[sleep["index_diff"] > 1].copy()
 
             if len(changes) > 0:
-                changes['start'] = changes['index'] - changes['index_diff'] + 1
-                changes['end'] = changes['index']
+                changes["start"] = changes["index"] - changes["index_diff"] + 1
+                changes["end"] = changes["index"]
 
-                active_states += changes.apply(lambda x: np.arange(x['start'], x['end'], dtype='int').tolist(),
-                                               axis=1).tolist()
+                active_states += changes.apply(
+                    lambda x: np.arange(x["start"], x["end"], dtype="int").tolist(),
+                    axis=1,
+                ).tolist()
 
-                sleep_max = sleep['index'].max() + 1
+                sleep_max = sleep["index"].max() + 1
                 if sleep_max < len(signal):
-                    active_states.append(np.arange(sleep_max, len(signal), dtype='int').tolist())
+                    active_states.append(
+                        np.arange(sleep_max, len(signal), dtype="int").tolist()
+                    )
 
         starts = []
         lens = []
@@ -94,7 +98,7 @@ class ShuffleAnalysis:
             starts.append(x[0])
             lens.append(len(x))
 
-        df = pd.DataFrame({'start': starts, 'len': lens})
+        df = pd.DataFrame({"start": starts, "len": lens})
 
         intervals = np.random.randint(100, size=len(df) + 1)
         intervals = intervals / intervals.sum() * len(signal[signal == 0])
@@ -108,13 +112,13 @@ class ShuffleAnalysis:
 
         for i in range(len(order)):
             shuff += [0] * intervals[i]
-            shuff += [1] * df.iloc[order[i]]['len']
+            shuff += [1] * df.iloc[order[i]]["len"]
 
         shuff += [0] * intervals[-1]
 
         return shuff
 
-    def correlation_ptp(self, corr_type='active', position=False):
+    def correlation_ptp(self, corr_type="active", position=False):
         """
         Function for plotting correlation range
         :param corr_type: type of correlation
@@ -122,40 +126,50 @@ class ShuffleAnalysis:
                 * active_acc
         :param position: consideration of spatial position
         """
-        df = pd.DataFrame(columns=['date', 'model', 'values'])
+        df = pd.DataFrame(columns=["date", "model", "values"])
 
         for date in tqdm(self.dates):
-            corr = corr_df_to_distribution(self.original_data[date].get_correlation(corr_type, position))
-            df = df.append(pd.DataFrame({'date': date, 'model': 'original', 'values': corr}))
+            corr = corr_df_to_distribution(
+                self.original_data[date].get_correlation(corr_type, position)
+            )
+            df = df.append(
+                pd.DataFrame({"date": date, "model": "original", "values": corr})
+            )
 
-            corr = corr_df_to_distribution(self.shuffled_data[date].get_correlation(corr_type, position))
-            df = df.append(pd.DataFrame({'date': date, 'model': 'shuffle', 'values': corr}))
+            corr = corr_df_to_distribution(
+                self.shuffled_data[date].get_correlation(corr_type, position)
+            )
+            df = df.append(
+                pd.DataFrame({"date": date, "model": "shuffle", "values": corr})
+            )
 
         df = df.fillna(0)
 
-        ptp = df.groupby(['model', 'date']).agg({'values': np.ptp}).reset_index()
-        diff = ptp.groupby(['date']).agg({'model': list, 'values': np.diff}).reset_index()
-        diff['values'] = -diff['values']
+        ptp = df.groupby(["model", "date"]).agg({"values": np.ptp}).reset_index()
+        diff = (
+            ptp.groupby(["date"]).agg({"model": list, "values": np.diff}).reset_index()
+        )
+        diff["values"] = -diff["values"]
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 
-        ax[0].set_title('Размах', fontsize=16)
-        sns.barplot(data=ptp, hue='model', x='date', y='values', ax=ax[0])
-        ax[0].tick_params(axis='x', rotation=45)
-        ax[0].tick_params(axis='both', labelsize=13)
-        ax[0].set_ylabel('Размах', fontsize=14)
-        ax[0].set_xlabel('Дата', fontsize=14)
+        ax[0].set_title("Размах", fontsize=16)
+        sns.barplot(data=ptp, hue="model", x="date", y="values", ax=ax[0])
+        ax[0].tick_params(axis="x", rotation=45)
+        ax[0].tick_params(axis="both", labelsize=13)
+        ax[0].set_ylabel("Размах", fontsize=14)
+        ax[0].set_xlabel("Дата", fontsize=14)
 
-        ax[1].set_title('Разность размаха', fontsize=16)
-        sns.barplot(data=diff, x='date', y='values', ax=ax[1])
-        ax[1].tick_params(axis='x', rotation=45)
-        ax[1].tick_params(axis='both', labelsize=13)
-        ax[1].set_ylabel('Разность', fontsize=14)
-        ax[1].set_xlabel('Дата', fontsize=14)
+        ax[1].set_title("Разность размаха", fontsize=16)
+        sns.barplot(data=diff, x="date", y="values", ax=ax[1])
+        ax[1].tick_params(axis="x", rotation=45)
+        ax[1].tick_params(axis="both", labelsize=13)
+        ax[1].set_ylabel("Разность", fontsize=14)
+        ax[1].set_xlabel("Дата", fontsize=14)
 
         plt.show()
 
-    def statistic_info(self, stat_type='network_spike_rate'):
+    def statistic_info(self, stat_type="network_spike_rate"):
         """
         Function for plotting statistic info
         :param stat_type: type of statistic
@@ -166,39 +180,40 @@ class ShuffleAnalysis:
         models = []
         dates_df = []
 
-        for data, name in zip([self.original_data, self.shuffled_data],
-                              ['original', 'shuffle']):
+        for data, name in zip(
+            [self.original_data, self.shuffled_data], ["original", "shuffle"]
+        ):
 
             for date in self.dates:
 
-                if stat_type == 'network_spike_peak':
-                    val = data[date].network_spike_peak(1).T['peak'].tolist()
+                if stat_type == "network_spike_peak":
+                    val = data[date].network_spike_peak(1).T["peak"].tolist()
                 else:
-                    val = data[date].network_spike_rate(1).T['spike rate'].tolist()
+                    val = data[date].network_spike_rate(1).T["spike rate"].tolist()
 
                 values += val
                 models += [name] * len(val)
                 dates_df += [date] * len(val)
 
-        df = pd.DataFrame({'values': values, 'model': models, 'date': dates_df})
-        maximum = df.groupby(['model', 'date']).agg({'values': np.max}).reset_index()
-        mean = df.groupby(['model', 'date']).agg({'values': np.mean}).reset_index()
+        df = pd.DataFrame({"values": values, "model": models, "date": dates_df})
+        maximum = df.groupby(["model", "date"]).agg({"values": np.max}).reset_index()
+        mean = df.groupby(["model", "date"]).agg({"values": np.mean}).reset_index()
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 
-        ax[0].set_title('Максимум', fontsize=16)
-        sns.barplot(data=maximum, hue='model', x='date', y='values', ax=ax[0])
-        ax[0].tick_params(axis='x', rotation=45)
-        ax[0].tick_params(axis='both', labelsize=13)
-        ax[0].set_ylabel('Максимум', fontsize=14)
-        ax[0].set_xlabel('Дата', fontsize=14)
+        ax[0].set_title("Максимум", fontsize=16)
+        sns.barplot(data=maximum, hue="model", x="date", y="values", ax=ax[0])
+        ax[0].tick_params(axis="x", rotation=45)
+        ax[0].tick_params(axis="both", labelsize=13)
+        ax[0].set_ylabel("Максимум", fontsize=14)
+        ax[0].set_xlabel("Дата", fontsize=14)
 
-        ax[1].set_title('Среднее', fontsize=16)
-        sns.barplot(data=mean, hue='model', x='date', y='values', ax=ax[1])
-        ax[1].tick_params(axis='x', rotation=45)
-        ax[1].tick_params(axis='both', labelsize=13)
-        ax[1].set_ylabel('Среднее', fontsize=14)
-        ax[1].set_xlabel('Дата', fontsize=14)
+        ax[1].set_title("Среднее", fontsize=16)
+        sns.barplot(data=mean, hue="model", x="date", y="values", ax=ax[1])
+        ax[1].tick_params(axis="x", rotation=45)
+        ax[1].tick_params(axis="both", labelsize=13)
+        ax[1].set_ylabel("Среднее", fontsize=14)
+        ax[1].set_xlabel("Дата", fontsize=14)
 
         plt.show()
 
@@ -209,17 +224,17 @@ class ShuffleAnalysis:
         """
         fig, ax = plt.subplots(2, 1, figsize=(15, 10))
 
-        ax[0].set_title('Исходные данные', fontsize=20)
+        ax[0].set_title("Исходные данные", fontsize=20)
         sns.heatmap(self.original_data[date].active_state_df, cbar=False, ax=ax[0])
         ax[0].set_xticks([])
         ax[0].set_yticks([])
-        ax[0].set_ylabel('Нейроны', fontsize=18)
+        ax[0].set_ylabel("Нейроны", fontsize=18)
 
-        ax[1].set_title('Перемешанные данные', fontsize=20)
+        ax[1].set_title("Перемешанные данные", fontsize=20)
         sns.heatmap(self.shuffled_data[date].active_state_df, cbar=False, ax=ax[1])
         ax[1].set_yticks([])
         ax[1].set_xticks([])
-        ax[1].set_xlabel('Время \u2192', fontsize=18)
-        ax[1].set_ylabel('Нейроны', fontsize=18)
+        ax[1].set_xlabel("Время \u2192", fontsize=18)
+        ax[1].set_ylabel("Нейроны", fontsize=18)
 
         plt.show()

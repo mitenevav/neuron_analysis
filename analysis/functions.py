@@ -29,8 +29,8 @@ def active_df_to_dict(df):
         sig = df[col]
         active = sig[sig == True]
 
-        idx = active.reset_index()[['index']].diff()
-        idx = idx[idx['index'] > 1]
+        idx = active.reset_index()[["index"]].diff()
+        idx = idx[idx["index"] > 1]
 
         d[col] = np.array_split(np.array(active.index.tolist()), idx.index.tolist())
     return d
@@ -44,5 +44,7 @@ def crosscorr(signal1, signal2, lag=100):
     :param lag: lag radius
     :return: maximum correlation value
     """
-    corr = list(sm.tsa.stattools.ccf(signal1, signal2)[:lag+1]) + list(sm.tsa.stattools.ccf(signal2, signal1)[1:lag+1])
+    corr = list(sm.tsa.stattools.ccf(signal1, signal2)[: lag + 1]) + list(
+        sm.tsa.stattools.ccf(signal2, signal1)[1 : lag + 1]
+    )
     return max(corr)
