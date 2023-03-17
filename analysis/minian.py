@@ -7,6 +7,9 @@ from tqdm.notebook import tqdm
 from scipy import ndimage
 from os import path, mkdir
 from analysis.functions import crosscorr
+from pyitlib.discrete_random_variable import entropy_conditional, entropy_joint
+from scipy.cluster.hierarchy import linkage, fcluster
+from analysis.functions import corr_df_to_distribution
 
 sns.set(color_codes=True)
 
@@ -152,7 +155,6 @@ class MinianAnalysis:
         self.smooth_diff = self.smooth_signals.diff()[1:].reset_index(drop=True)
 
         for num in tqdm(self.smooth_signals.columns):
-
             y = self.smooth_diff[num]
 
             y_pos = y[y >= 0]
@@ -175,7 +177,6 @@ class MinianAnalysis:
             self.active_state[num] = peaks_idx
 
             if verbose:
-
                 signal = self.signals[num]
 
                 plt.figure(figsize=(15, 10))
@@ -416,7 +417,7 @@ class MinianAnalysis:
         Burst rate - number of cell activations per minute
         """
         burst_rate = self.burst_rate()
-        burst_rate.to_csv(self.results_folder + "/burst_rate.csv")
+        burst_rate.to_excel(self.results_folder + "/burst_rate.xlsx")
 
     def save_network_spike_rate(self, period):
         """
@@ -425,7 +426,7 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         nsr = self.network_spike_rate(period)
-        nsr.to_csv(self.results_folder + "/network_spike_rate.csv")
+        nsr.to_excel(self.results_folder + "/network_spike_rate.xlsx")
 
     def save_network_spike_duration(self, thresholds):
         """
@@ -434,7 +435,7 @@ class MinianAnalysis:
         :param thresholds: threshold values in percentages
         """
         nsd_df = self.network_spike_duration(thresholds)
-        nsd_df.to_csv(self.results_folder + "/network_spike_duration.csv")
+        nsd_df.to_excel(self.results_folder + "/network_spike_duration.xlsx")
 
     def save_network_spike_peak(self, period):
         """
@@ -443,7 +444,7 @@ class MinianAnalysis:
         :param period: period in seconds
         """
         nsp_df = self.network_spike_peak(period)
-        nsp_df.to_csv(self.results_folder + "/network_spike_peak.csv")
+        nsp_df.to_excel(self.results_folder + "/network_spike_peak.xlsx")
 
     def compute_nzsfi(self):
         """
@@ -509,6 +510,32 @@ class MinianAnalysis:
 
         return cross_corr_df
 
+    def compute_transfer_entropy(self):
+        """
+        Function for computing transfer_entropy
+        :return: FataFrame with transfer_entropy
+        """
+        te = np.zeros((self.signals.shape[1], self.signals.shape[1]))
+        columns = self.signals.columns.tolist()
+
+        vals = self.signals.values
+        vals = (vals / vals.max(axis=0) * 100).astype(int).T
+
+        for i, target in tqdm(
+            enumerate(vals), total=len(vals), desc="Transfer entropy computing..."
+        ):
+            x = target[1:]
+            z = target[:-1]
+
+            entr_cond = entropy_conditional(x, z)
+
+            for j, source in enumerate(vals):
+                y = source[:-1]
+
+                te[j, i] = entr_cond - entropy_joint([x, y, z]) + entropy_joint([y, z])
+
+        return pd.DataFrame(te).set_axis(columns, axis=0).set_axis(columns, axis=1)
+
     def get_correlation(self, method="signal", position=False, lag=0):
         """
         Function for computing correlation
@@ -528,6 +555,8 @@ class MinianAnalysis:
             corr_df = self.compute_cross_correlation(self.active_state_df, lag)
         elif method == "active_acc":
             corr_df = self.compute_spike_accuracy()
+        elif method == "transfer_entropy":
+            corr_df = self.compute_transfer_entropy()
         else:
             print(f"Method {method} is not supported!")
             return
@@ -557,8 +586,10 @@ class MinianAnalysis:
 
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
-        self.active_state_df.astype(int).to_csv(
-            path.join(self.results_folder, f"active_states_{self.type_of_activity}.csv")
+        self.active_state_df.astype(int).to_excel(
+            path.join(
+                self.results_folder, f"active_states_{self.type_of_activity}.xlsx"
+            )
         )
 
     def save_correlation_matrix(self, method="signal", position=False, lag=0):
@@ -577,10 +608,10 @@ class MinianAnalysis:
         if not path.exists(self.results_folder):
             mkdir(self.results_folder)
 
-        corr_df.to_csv(
+        corr_df.to_excel(
             path.join(
                 self.results_folder,
-                f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.csv",
+                f"correlation_{self.type_of_activity}_{method}{'_position' if position else ''}.xlsx",
             )
         )
 
@@ -598,7 +629,7 @@ class MinianAnalysis:
         """
         corr_df = self.get_correlation(method, position=position, lag=lag)
 
-        fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+        fig, ax = plt.subplots(2, 2, figsize=(20, 20))
 
         c = 1
         corr = []
@@ -608,28 +639,46 @@ class MinianAnalysis:
 
             c += 1
 
-        sns.histplot(corr, stat="percent", ax=ax[0])
-        ax[0].set_ylabel("percent", fontsize=20)
-        ax[0].set_title(f"Correlation distribution for {method} method", fontsize=24)
+        sns.histplot(corr, stat="percent", ax=ax[0][0])
+        ax[0][0].set_ylabel("percent", fontsize=20)
+        ax[0][0].set_title(f"Correlation distribution for {method} method", fontsize=24)
+
+        clusters = self.get_corr_clustering(corr_df)
+        cluster_corr_df = corr_df[clusters[:, 0]].loc[clusters[:, 0]]
+        clusters = pd.DataFrame(clusters).groupby(1).agg(len)[0]
+
+        sns.heatmap(cluster_corr_df, vmin=-1, vmax=1, cmap="coolwarm", ax=ax[1][0])
+        ax[1][0].set_title(f"Correlation heatmap", fontsize=24)
+
+        sns.heatmap(cluster_corr_df > threshold, cmap="binary", cbar=False, ax=ax[1][1])
+        ax[1][1].set_title(f"Correlation binary heatmap", fontsize=24)
+
+        lw = len(corr_df) * 0.005
+        for i, n in enumerate(clusters):
+            start = clusters[:i].sum()
+            x = np.array([start, start, start + n, start + n, start])
+            y = np.array([start, start + n, start + n, start, start])
+            ax[1][0].plot(x, y, linewidth=lw, c="k")
+            ax[1][1].plot(x, y, linewidth=lw, c="k")
 
         corr_df = corr_df[(corr_df > threshold) & (corr_df.abs() < 1)]
         corr_df.dropna(axis=0, how="all", inplace=True)
         corr_df.dropna(axis=1, how="all", inplace=True)
 
-        ax[1].set_title(f"Correlation map for {method} method", fontsize=24)
+        ax[0][1].set_title(f"Correlation map for {method} method", fontsize=24)
 
         c = 0
         for i, row in corr_df.iterrows():
             for j in corr_df.columns.tolist()[c:]:
                 if not np.isnan(row[j]):
-                    ax[1].plot(
+                    ax[0][1].plot(
                         self.positions.loc[[i, j]]["y"],
                         self.positions.loc[[i, j]]["x"],
                         color="r",
                         lw=0.5 + (row[j] - threshold) / (1 - threshold) * 4,
                     )
 
-            ax[1].scatter(
+            ax[0][1].scatter(
                 x=self.positions.loc[i]["y"],
                 y=self.positions.loc[i]["x"],
                 color="w",
@@ -637,5 +686,68 @@ class MinianAnalysis:
             )
             c += 1
 
-        ax[1].scatter(x=self.positions["y"], y=self.positions["x"], s=100, zorder=4)
+        ax[0][1].scatter(x=self.positions["y"], y=self.positions["x"], s=100, zorder=4)
         plt.show()
+
+    @staticmethod
+    def get_corr_clustering(corr_df):
+        """
+        Function for getting correlation clusters
+        :param corr_df: dataframe with correlation values
+        :return: 2d array, where 1 - unit id, 2 cluster id
+        """
+        corr_df = (corr_df + corr_df.T) / 2
+
+        dissimilarity = corr_df_to_distribution(
+            corr_df.abs().max().max() - corr_df.abs()
+        )
+        hierarchy = linkage(dissimilarity, method="average")
+
+        clusters = fcluster(
+            hierarchy, np.quantile(dissimilarity, 0.2), criterion="distance"
+        )
+        clusters = [[col, cl] for col, cl in zip(corr_df.columns, clusters)]
+        clusters.sort(key=lambda x: x[1])
+
+        return np.array(clusters)
+
+    @staticmethod
+    def get_cluster_stats(corr_df):
+        """
+        Function for computing stats in correlation clusters
+        :param corr_df: dataframe with correlation values
+        :return: number of clusters, mean cluster size, mean intercluster distance, mean intracluster distance
+        """
+        clusters = MinianAnalysis.get_corr_clustering(corr_df)
+
+        corr_df = corr_df[clusters[:, 0]].loc[clusters[:, 0]]
+        lens = pd.DataFrame(clusters).groupby(1).agg(len)[0]
+
+        intercluster_dist = []
+        for i, n in enumerate(lens[:-1]):
+            start_y = lens[:i].sum()
+            for j, m in enumerate(lens[i + 1 :], start=i + 1):
+                start_x = lens[:j].sum()
+                intercluster_dist.append(
+                    corr_df.values[start_y : start_y + n, start_x : start_x + m].mean()
+                )
+
+        intracluster_dist = []
+        for i, n in enumerate(lens):
+            start = lens[:i].sum()
+            corr_distr = corr_df_to_distribution(
+                corr_df.iloc[start : start + n].T.iloc[start : start + n]
+            )
+            intracluster_dist.append(np.mean(corr_distr) if len(corr_distr) > 0 else 1)
+
+        clusters_num = len(lens)
+        mean_cluster_size = lens.mean()
+        mean_intercluster_dist = np.mean(intercluster_dist)
+        mean_intracluster_dist = np.mean(intracluster_dist)
+
+        return (
+            clusters_num,
+            mean_cluster_size,
+            mean_intercluster_dist,
+            mean_intracluster_dist,
+        )

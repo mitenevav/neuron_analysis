@@ -17,12 +17,16 @@ class StatTests:
     Based on results of MinianAnalysis
     """
 
-    def __init__(self, path_to_data, dates, fps, verbose=True):
+    def __init__(self, path_to_data, sessions, verbose=True):
         """
         Initialization function
         :param path_to_data: path to directory with sessions folders
-        :param dates: folders session names
-        :param fps: frames per second
+        :param sessions: dict with information about sessions
+                        {session 1:
+                            {'path': path to session folder,
+                             'fps': fps of session},
+                         session 2: ...
+                         }
         :param verbose: visualization of interim results and progress
         """
         self.base_correlations = [
@@ -32,43 +36,48 @@ class StatTests:
             "active_acc",
         ]
 
-        self.corr_types = self.base_correlations + [
-            x + "_position" for x in self.base_correlations
-        ]
-
-        self.fps = fps
         self.verbose = verbose
 
         self.corr_dfs = {}
         self.corr_distr = {}
         self.signals = {}
-        self.dates = dates
+        self.params = sessions
         self.path_to_data = path_to_data
 
-        for date in self.dates:
-            distr_dict = {}
-            df_dict = {}
-            for t in self.corr_types:
-                corr_df = pd.read_csv(
-                    f"{self.path_to_data}/{date}/results/correlation_spike_{t}.csv",
-                    index_col=0,
-                )
-
-                df_dict[t] = corr_df.copy()
-                distr_dict[t] = corr_df_to_distribution(corr_df)
-
-            self.corr_dfs[date] = df_dict
-
-            self.corr_distr[date] = distr_dict
-
-            ma = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", self.fps)
-            ma.active_state_df = pd.read_csv(
-                f"{self.path_to_data}/{date}/results/active_states_spike.csv",
+        for date in self.params:
+            session_path = self.params[date]["path"]
+            ma = MinianAnalysis(
+                f"{self.path_to_data}/{session_path}/minian/", self.params[date]["fps"]
+            )
+            ma.active_state_df = pd.read_excel(
+                f"{self.path_to_data}/{session_path}/results/active_states_spike.xlsx",
                 index_col=0,
             ).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
 
+            ma.smooth_signals = ma.signals.rolling(
+                window=10, center=True, min_periods=0
+            ).mean()
+            ma.smooth_diff = ma.smooth_signals.diff()[1:].reset_index(drop=True)
+
             self.signals[date] = ma
+
+            distr_dict = {}
+            df_dict = {}
+            for t in self.base_correlations:
+                corr_df = ma.get_correlation(t)
+
+                df_dict[t] = corr_df.copy()
+                distr_dict[t] = corr_df_to_distribution(corr_df)
+
+                corr_df = ma.get_correlation(t, position=True)
+
+                df_dict[t + "_position"] = corr_df.copy()
+                distr_dict[t + "_position"] = corr_df_to_distribution(corr_df)
+
+            self.corr_dfs[date] = df_dict
+
+            self.corr_distr[date] = distr_dict
 
         br = pd.DataFrame()
         nsr = pd.DataFrame()
@@ -100,11 +109,20 @@ class StatTests:
 
         self.all_corr = pd.DataFrame()
 
-        for date in dates:
-            for t in self.corr_types:
+        for date in self.params:
+            for t in self.base_correlations:
                 self.all_corr = self.all_corr.append(
                     pd.DataFrame(
                         {"values": self.corr_distr[date][t], "date": date, "type": t}
+                    )
+                )
+                self.all_corr = self.all_corr.append(
+                    pd.DataFrame(
+                        {
+                            "values": self.corr_distr[date][t + "_position"],
+                            "date": date,
+                            "type": t,
+                        }
                     )
                 )
 
@@ -144,7 +162,7 @@ class StatTests:
             for t, ax in zip(corr_types, axs.flatten()):
                 df = pd.DataFrame()
 
-                for date in self.dates:
+                for date in self.params:
                     label = f"{len(self.corr_dfs[date][t])} neurons"
                     df = df.append(
                         pd.DataFrame(self.corr_distr[date][t]).T.rename(
@@ -164,8 +182,7 @@ class StatTests:
             fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
             for t, ax in zip(corr_types, axs.flatten()):
-
-                for date in self.dates:
+                for date in self.params:
                     sns.kdeplot(
                         self.corr_distr[date][t],
                         label=f"{len(self.corr_dfs[date][t])} neurons",
@@ -189,23 +206,21 @@ class StatTests:
         """
         dist_tets = pd.DataFrame(columns=[True, False])
 
-        n = (len(self.dates) ** 2 - len(self.dates)) / 2
+        n = (len(self.params) ** 2 - len(self.params)) / 2
 
         alpha = 0.05 / n
 
         for test, title in zip(
             [mannwhitneyu, ks_2samp], ["Mann–Whitney U test", "Kolmogorov–Smirnov test"]
         ):
-
             test_res = {}
             for t in data:
                 df = data[t]
                 lst = []
-                for i in range(len(self.dates) - 1):
-                    for j in range(i + 1, len(self.dates)):
-                        p = test(
-                            df[self.dates[i]].dropna(), df[self.dates[j]].dropna()
-                        )[1]
+                dates = list(self.params.keys())
+                for i in range(len(dates) - 1):
+                    for j in range(i + 1, len(dates)):
+                        p = test(df[dates[i]].dropna(), df[dates[j]].dropna())[1]
                         lst.append(p)
                 test_res[t] = (pd.Series(lst) > alpha).value_counts()
 
@@ -232,14 +247,14 @@ class StatTests:
         """
         test_df = pd.DataFrame(columns=[True, False])
 
-        alpha = 0.05 / len(self.dates)
+        alpha = 0.05 / len(self.params)
 
         test_res = {}
         for t in data:
             df = data[t]
             lst = []
-            for i in range(len(self.dates)):
-                lst.append(kstest(df[self.dates[i]], "norm")[1])
+            for i in self.params:
+                lst.append(kstest(df[i], "norm")[1])
                 # lst.append(normaltest(df[dates[i]])[1])
 
             test_res[t] = (pd.Series(lst) > alpha).value_counts()
@@ -258,14 +273,21 @@ class StatTests:
         """
         if data_type == "corr":
             data = {}
-            for t in self.corr_types:
+            for t in self.base_correlations:
                 type_df = pd.DataFrame()
-                for date in self.dates:
+                for date in self.params:
                     type_df = type_df.append(
                         pd.Series(self.corr_distr[date][t], name=date)
                     )
-
                 data[t] = type_df.T
+
+                type_df = pd.DataFrame()
+                for date in self.params:
+                    type_df = type_df.append(
+                        pd.Series(self.corr_distr[date][t + "_position"], name=date)
+                    )
+                data[t + "_position"] = type_df.T
+
             return data
         else:
             data = {}
@@ -313,7 +335,6 @@ class StatTests:
             ],
             axs.flatten(),
         ):
-
             for day in df:
                 sns.kdeplot(
                     df[day],
@@ -353,7 +374,7 @@ class StatTests:
             ax.set_title(f"Degree of network ({corr_type})", fontsize=18)
             ax.tick_params(axis="both", labelsize=14)
             thrs = np.arange(interval[0], interval[1], step)
-            for date in self.dates:
+            for date in self.params:
                 ax.plot(
                     thrs,
                     degree_of_network[corr_type][date],
@@ -382,7 +403,7 @@ class StatTests:
         for corr_type in corr_types:
             values = {}
             thrs = np.arange(interval[0], interval[1], step)
-            for date in self.dates:
+            for date in self.params:
                 corr = np.array(self.corr_distr[date][corr_type])
                 values[date] = [(corr > thr).sum() / len(corr) for thr in thrs]
 
@@ -404,12 +425,11 @@ class StatTests:
             corr_types = self.base_correlations
 
         for corr_type, ax in zip(corr_types, axs.flatten()):
-
             ax.set_xlabel("Network degree", fontsize=16)
             ax.set_ylabel("Coactive units degree", fontsize=16)
             ax.set_title(f"Distribution of network degree ({corr_type})", fontsize=18)
             ax.tick_params(axis="both", labelsize=14)
-            for date in self.dates:
+            for date in self.params:
                 degree = degree_distribution[corr_type][date]
                 num_of_neurons = len(self.corr_dfs[date][corr_type])
                 sns.lineplot(
@@ -438,13 +458,13 @@ class StatTests:
         degree_distribution = {}
         for corr_type in corr_types:
             total_distr = []
-            for date in self.dates:
+            for date in self.params:
                 total_distr += self.corr_distr[date][corr_type]
 
             thr = np.quantile(total_distr, q=q)
 
             degrees = {}
-            for date in self.dates:
+            for date in self.params:
                 corr_df = self.corr_dfs[date][corr_type]
                 degree = ((corr_df > thr).sum() - 1).value_counts().sort_index()
                 degrees[date] = degree
@@ -460,16 +480,17 @@ class StatTests:
         """
         dist_tets = pd.DataFrame(columns=[True, False])
 
-        n = (len(self.dates) ** 2 - len(self.dates)) / 2
+        n = (len(self.params) ** 2 - len(self.params)) / 2
 
         alpha = alpha / n
 
         test_res = {}
         for t in data:
             lst = []
-            for i in range(len(self.dates) - 1):
-                for j in range(i + 1, len(self.dates)):
-                    p = wilcoxon(data[t][self.dates[i]], data[t][self.dates[j]])[1]
+            dates = list(self.params.keys())
+            for i in range(len(dates) - 1):
+                for j in range(i + 1, len(dates)):
+                    p = wilcoxon(data[t][dates[i]], data[t][dates[j]])[1]
                     lst.append(p)
             test_res[t] = (pd.Series(lst) > alpha).value_counts()
 

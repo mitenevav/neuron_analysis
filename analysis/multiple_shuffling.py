@@ -18,8 +18,7 @@ class MultipleShuffler:
     def __init__(
         self,
         path_to_data,
-        dates,
-        fps,
+        sessions,
         num_of_shuffles=10,
         shuffle_fractions=None,
         correlation_type="active",
@@ -28,8 +27,12 @@ class MultipleShuffler:
         """
         Initialization function
         :param path_to_data: path to directory with sessions folders
-        :param dates: folders session names
-        :param fps: frames per second
+        :param sessions: dict with information about sessions
+                        {session 1:
+                            {'path': path to session folder,
+                             'fps': fps of session},
+                         session 2: ...
+                         }
         :param num_of_shuffles: number of shuffles per case
         :param shuffle_fractions: fraction of shuffled neurons
         :param correlation_type: type of correlation for analysis
@@ -42,8 +45,7 @@ class MultipleShuffler:
             shuffle_fractions = [0.25, 0.5, 0.75, 1.0]
 
         self.path_to_data = path_to_data
-        self.dates = dates
-        self.fps = fps
+        self.dates = sessions
         self.num_of_shuffles = num_of_shuffles
         self.shuffle_fractions = shuffle_fractions
         self.correlation_type = correlation_type
@@ -64,7 +66,6 @@ class MultipleShuffler:
                 0: ShuffleAnalysis(
                     self.path_to_data,
                     self.dates,
-                    self.fps,
                     shuffle_fraction=0,
                     verbose=False,
                 )
@@ -81,7 +82,6 @@ class MultipleShuffler:
                 ptr[i] = ShuffleAnalysis(
                     self.path_to_data,
                     self.dates,
-                    self.fps,
                     shuffle_fraction=shuffle_fraction,
                     verbose=False,
                 )

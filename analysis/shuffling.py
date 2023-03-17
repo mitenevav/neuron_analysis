@@ -15,34 +15,42 @@ class ShuffleAnalysis:
     Class for randomly shuffling neuron activity
     """
 
-    def __init__(self, path_to_data, dates, fps, shuffle_fraction=1.0, verbose=True):
+    def __init__(self, path_to_data, sessions, shuffle_fraction=1.0, verbose=True):
         """
         Initialization function
         :param path_to_data: path to directory with sessions folders
-        :param dates: folders session names
-        :param fps: frames per second
+        :param sessions: dict with information about sessions
+                        {session 1:
+                            {'path': path to session folder,
+                             'fps': fps of session},
+                         session 2: ...
+                         }
         :param shuffle_fraction: fraction of shuffled neurons
         :param verbose: visualization of interim results and progress
         """
 
-        self.dates = dates
+        self.dates = sessions
         self.path_to_data = path_to_data
-        self.fps = fps
         self.verbose = verbose
 
         self.original_data = {}
         self.shuffled_data = {}
 
         for date in tqdm(self.dates, disable=(not self.verbose)):
-            ma_o = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", self.fps)
-            ma_o.active_state_df = pd.read_csv(
-                f"{self.path_to_data}/{date}/results/active_states_spike.csv",
+            session_path = self.dates[date]["path"]
+            ma_o = MinianAnalysis(
+                f"{self.path_to_data}/{session_path}/minian/", self.dates[date]["fps"]
+            )
+            ma_o.active_state_df = pd.read_excel(
+                f"{self.path_to_data}/{session_path}/results/active_states_spike.xlsx",
                 index_col=0,
             ).astype(bool)
 
             ma_o.active_state = active_df_to_dict(ma_o.active_state_df)
 
-            ma_s = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", self.fps)
+            ma_s = MinianAnalysis(
+                f"{self.path_to_data}/{session_path}/minian/", self.dates[date]["fps"]
+            )
 
             ma_s.active_state_df = ma_o.active_state_df.copy()
             idx = ma_s.active_state_df.sample(axis=1, frac=shuffle_fraction).columns
@@ -183,9 +191,7 @@ class ShuffleAnalysis:
         for data, name in zip(
             [self.original_data, self.shuffled_data], ["original", "shuffle"]
         ):
-
             for date in self.dates:
-
                 if stat_type == "network_spike_peak":
                     val = data[date].network_spike_peak(1).T["peak"].tolist()
                 else:

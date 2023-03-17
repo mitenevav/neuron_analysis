@@ -40,8 +40,8 @@ class Data:
             ma = MinianAnalysis(
                 f"{path_to_data}/{session_path}/minian/", self.params[date]["fps"]
             )
-            ma.active_state_df = pd.read_csv(
-                f"{path_to_data}/{session_path}/results/active_states_spike.csv",
+            ma.active_state_df = pd.read_excel(
+                f"{path_to_data}/{session_path}/results/active_states_spike.xlsx",
                 index_col=0,
             ).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
@@ -119,19 +119,11 @@ class Data:
         :param method: method of correlation
         :return: DataFrame with correlation distribution
         """
-        df_corr = pd.DataFrame()
+        corr_dict = {}
         for date in self.sessions:
-            df_ptr = pd.DataFrame()
-            df_ptr[f"corr_{method}"] = corr_df_to_distribution(
-                self.models[date].get_correlation(method)
-            )
-            df_ptr["model"] = date
-            df_corr = df_corr.append(df_ptr)
+            corr_dict[date] = self.models[date].get_correlation(method).fillna(0)
 
-        df_corr = df_corr.reset_index(drop=True)
-        df_corr = df_corr.fillna(0)
-
-        return df_corr
+        return corr_dict
 
     def _get_nd_data(
         self,
@@ -177,12 +169,14 @@ class Data:
         """
         df_conn = pd.DataFrame()
 
-        total_distr = df_corr[f"corr_{method}"].dropna().tolist()
+        total_distr = []
+        for x in df_corr:
+            total_distr.extend(corr_df_to_distribution(df_corr[x]))
         thr = np.quantile(total_distr, q=q)
 
         for date in self.sessions:
             df_ptr = pd.DataFrame()
-            corr_df = self.models[date].get_correlation(method)
+            corr_df = df_corr[date]
             df_ptr[f"connectivity_{method}"] = ((corr_df > thr).sum() - 1) / len(
                 corr_df
             )
@@ -193,9 +187,10 @@ class Data:
 
         return df_conn
 
-    def get_data(self):
+    def get_data(self, transfer_entropy=False):
         """
         Function for collecting all data
+        :param transfer_entropy: bool: compute transfer entropy or not (time-consuming)
         """
 
         df_br = self._get_burst_rate_data()
@@ -210,15 +205,47 @@ class Data:
 
         corr_types = ["signal", "diff", "active", "active_acc"]
 
+        if transfer_entropy:
+            corr_types += ["transfer_entropy"]
+
         df_corr = {}
+        corr_distr = {}
         corrs = {}
+        cluster_stats = {}
         for corr in tqdm(
             corr_types,
             disable=self.disable_verbose,
             desc="Step 4/6: Correlation computing...",
         ):
-            df_corr[corr] = self._get_corr_data(corr)
-            corrs[corr] = df_corr[corr].groupby("model").agg(agg_functions)
+            corr_tmp = self._get_corr_data(corr)
+            df_corr[corr] = corr_tmp
+
+            corr_distr[corr] = pd.concat(
+                [
+                    pd.DataFrame(
+                        {
+                            f"corr_{corr}": corr_df_to_distribution(corr_tmp[x]),
+                            "model": x,
+                        }
+                    )
+                    for x in corr_tmp
+                ]
+            ).reset_index(drop=True)
+
+            corrs[corr] = corr_distr[corr].groupby("model").agg(agg_functions)
+
+            cl_stats = [
+                list(MinianAnalysis.get_cluster_stats(corr_tmp[x]))[2:] + [x]
+                for x in corr_tmp
+            ]
+            cluster_stats[corr] = pd.DataFrame(
+                cl_stats,
+                columns=[
+                    f"intercluster_dist_{corr}",
+                    f"intracluster_dist_{corr}",
+                    "model",
+                ],
+            )
 
         df_network_degree = {}
         for corr in tqdm(
@@ -226,7 +253,7 @@ class Data:
             disable=self.disable_verbose,
             desc="Step 5/6: Network degree computing...",
         ):
-            df_network_degree[corr] = self._get_nd_data(df_corr[corr], method=corr)
+            df_network_degree[corr] = self._get_nd_data(corr_distr[corr], method=corr)
 
         df_conn = {}
         for corr in tqdm(
@@ -252,6 +279,9 @@ class Data:
 
         for corr in corr_types:
             data = data.merge(df_network_degree[corr].reset_index(), on="model")
+
+        for corr in corr_types:
+            data = data.merge(cluster_stats[corr], on="model")
 
         data = data.set_index("model")
 

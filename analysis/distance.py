@@ -34,8 +34,8 @@ class DistanceAnalysis:
 
         for date in self.dates:
             ma = MinianAnalysis(f"{path_to_data}/{date}/minian/", fps)
-            ma.active_state_df = pd.read_csv(
-                f"{path_to_data}/{date}/results/active_states_spike.csv", index_col=0
+            ma.active_state_df = pd.read_excel(
+                f"{path_to_data}/{date}/results/active_states_spike.xlsx", index_col=0
             ).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
             self.models[date] = ma

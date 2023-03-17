@@ -1,5 +1,6 @@
 import numpy as np
 import statsmodels.api as sm
+from pyitlib import discrete_random_variable as drv
 
 
 def corr_df_to_distribution(df):
@@ -8,13 +9,16 @@ def corr_df_to_distribution(df):
     :param df: symmetric dataframe
     :return: list of values
     """
-    c = 1
     corr = []
-    for i, row in df.iterrows():
-        for j in df.columns.tolist()[c:]:
-            corr.append(row[j])
+    vals = df.values
 
-        c += 1
+    symm = (vals == vals.T).all()
+    for i, row in enumerate(vals):
+        if symm:
+            corr.extend(row[i + 1 :])
+        else:
+            corr.extend(list(row[:i]) + list(row[i + 1 :]))
+
     return corr
 
 
@@ -48,3 +52,11 @@ def crosscorr(signal1, signal2, lag=100):
         sm.tsa.stattools.ccf(signal2, signal1)[1 : lag + 1]
     )
     return max(corr)
+
+
+def transfer_entropy(x, y, k=1):
+    x = x[:-k]
+    z = y[:-k]
+    y = y[k:]
+
+    return float(drv.information_mutual_conditional(y, x, z))
