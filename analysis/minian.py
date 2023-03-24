@@ -751,3 +751,92 @@ class MinianAnalysis:
             mean_intercluster_dist,
             mean_intracluster_dist,
         )
+
+    def get_network_degree(self, method="signal", thrs=None):
+        """
+        Function for computing network degree
+        Network degree - share of strong network connections
+        :param method: method of correlation
+        :param thrs: list of thresholds for strong correlation between neurons
+        :return: network degree
+        """
+        if thrs is None:
+            thrs = np.arange(0, 1, 0.05)
+
+        corr = np.array(corr_df_to_distribution(self.get_correlation(method=method)))
+        nd_values = [(corr > thr).sum() / len(corr) for thr in thrs]
+
+        return pd.DataFrame({f"nd_{method}": nd_values, "threshold": thrs})
+
+    def show_network_degree(self, method="signal", thr=None):
+        """
+        Function for plotting network_degree
+        :param method: method of correlation
+        :param thrs: list of thresholds for strong correlation between neurons
+        """
+        nd_df = self.get_network_degree(method, thr)
+        plt.figure(figsize=(8, 6))
+        plt.title("Network degree", fontsize=17)
+        sns.lineplot(data=nd_df, x="threshold", y=f"nd_{method}")
+        plt.xlabel(f"threshold", fontsize=16)
+        plt.ylabel("network degree", fontsize=16)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.show()
+
+    def save_network_degree(self, method="signal", thr=None):
+        """
+        Function for saving network_degree
+        :param method: method of correlation
+        :param thrs: list of thresholds for strong correlation between neurons
+        """
+        nd_df = self.get_network_degree(method, thr)
+        nd_df.to_excel(self.results_folder + f"/network_degree_{method}.xlsx")
+
+    def get_connectivity(self, method="signal", thr=None):
+        """
+        Function for computing connectivity
+        Connectivity - share of strong connections for each neuron
+        :param method: method of correlation
+        :param thr: threshold for strong correlation between neurons
+        :return: connectivity
+        """
+        if not thr:
+            m = {
+                "signal": 0.5,
+                "diff": 0.3,
+                "active": 0.1,
+                "active_acc": 0.1,
+                "transfer_entropy": 0.1,
+            }
+            thr = m[method]
+
+        df_conn = pd.DataFrame()
+        corr = self.get_correlation(method=method)
+        df_conn[f"connectivity_{method}"] = ((corr > thr).sum() - 1) / len(corr)
+        return df_conn
+
+    def show_connectivity(self, method="signal", thr=None):
+        """
+        Function for plotting connectivity distribution
+        :param method: method of correlation
+        :param thr: threshold for strong correlation between neurons
+        """
+        conn_df = self.get_connectivity(method, thr)
+        plt.figure(figsize=(8, 6))
+        plt.title("Connectivity", fontsize=17)
+        sns.histplot(data=conn_df, x=f"connectivity_{method}", bins=8, stat="percent")
+        plt.xlabel(f"connectivity", fontsize=16)
+        plt.ylabel("percent", fontsize=16)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.show()
+
+    def save_connectivity(self, method="signal", thr=None):
+        """
+        Function for saving connectivity
+        :param method: method of correlation
+        :param thr: threshold for strong correlation between neurons
+        """
+        conn_df = self.get_connectivity(method, thr)
+        conn_df.to_excel(self.results_folder + f"/connectivity_{method}.xlsx")
