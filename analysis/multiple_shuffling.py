@@ -243,3 +243,11 @@ class MultipleShuffler:
         plt.title(f"Mean {statistic_type} peaks", fontsize=18)
         plt.tick_params(axis="both", labelsize=14)
         plt.show()
+
+    def save_results(self, path):
+        """
+        Function for saving connectivity
+        :param path: path to target folder
+        """
+        self.stat_df.to_excel(path + '/ms_stats.xlsx')
+        self.stat_df.to_excel(path + '/ms_corrs.xlsx')
