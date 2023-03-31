@@ -703,6 +703,13 @@ class MinianAnalysis:
         )
         hierarchy = linkage(dissimilarity, method="average")
 
+        dissimilarity = np.array(dissimilarity)
+        thr = 0
+        if dissimilarity[dissimilarity < 1].sum() > 0:
+            thr = np.quantile(dissimilarity, 0.2)
+            if thr == 1:
+                thr = dissimilarity[dissimilarity < 1].max()
+
         clusters = fcluster(
             hierarchy, np.quantile(dissimilarity, 0.2), criterion="distance"
         )
@@ -742,8 +749,8 @@ class MinianAnalysis:
 
         clusters_num = len(lens)
         mean_cluster_size = lens.mean()
-        mean_intercluster_dist = np.mean(intercluster_dist)
-        mean_intracluster_dist = np.mean(intracluster_dist)
+        mean_intercluster_dist = np.mean(intercluster_dist) if len(intercluster_dist) > 0 else 0
+        mean_intracluster_dist = np.mean(intracluster_dist) if len(intracluster_dist) > 0 else 1
 
         return (
             clusters_num,
