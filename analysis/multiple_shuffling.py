@@ -250,4 +250,4 @@ class MultipleShuffler:
         :param path: path to target folder
         """
         self.stat_df.to_excel(path + '/ms_stats.xlsx')
-        self.stat_df.to_excel(path + '/ms_corrs.xlsx')
+        self.corr_df.to_excel(path + '/ms_corrs.xlsx')
