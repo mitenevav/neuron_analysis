@@ -749,8 +749,12 @@ class MinianAnalysis:
 
         clusters_num = len(lens)
         mean_cluster_size = lens.mean()
-        mean_intercluster_dist = np.mean(intercluster_dist) if len(intercluster_dist) > 0 else 0
-        mean_intracluster_dist = np.mean(intracluster_dist) if len(intracluster_dist) > 0 else 1
+        mean_intercluster_dist = (
+            np.mean(intercluster_dist) if len(intercluster_dist) > 0 else 0
+        )
+        mean_intracluster_dist = (
+            np.mean(intracluster_dist) if len(intracluster_dist) > 0 else 1
+        )
 
         return (
             clusters_num,

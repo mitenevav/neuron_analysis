@@ -249,5 +249,28 @@ class MultipleShuffler:
         Function for saving connectivity
         :param path: path to target folder
         """
-        self.stat_df.to_excel(path + '/ms_stats.xlsx')
-        self.corr_df.to_excel(path + '/ms_corrs.xlsx')
+        self.stat_df.to_excel(path + "/ms_stats.xlsx")
+
+        agg_stat = (
+            self.stat_df.groupby(["date", "shuffle_fraction", "attempt"])
+            .agg(["mean", "max", "std"])
+            .reset_index()
+        )
+        agg_stat = (
+            agg_stat.groupby(["date", "shuffle_fraction"])
+            .agg("mean")
+            .drop(columns=["attempt"])
+        )
+
+        agg_stat.to_excel(path + "/ms_stats_aggregated.xlsx")
+
+        agg_corr = (
+            self.corr_df.groupby(["position", "date", "shuffle_fraction", "attempt"])
+            .agg(["mean", "std", np.ptp])
+            .reset_index()
+            .groupby(["position", "date", "shuffle_fraction"])
+            .agg("mean")
+            .drop(columns=["attempt"])
+        )
+
+        agg_corr.to_excel(path + "/ms_corr_aggregated.xlsx")

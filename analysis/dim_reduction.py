@@ -447,11 +447,12 @@ class Data:
         plt.barh(feat_std[-topn:].index, feat_std[-topn:])
         plt.show()
 
-    def show_stat(self, stat, condition="all"):
+    def show_stat(self, stat, condition="all", conditions_order=None):
         """
         Function for plotting bars with information about statistic
         :param stat: statistic for plotting
         :param condition: {'all' or specific condition} condition for plotting
+        :param conditions_order: order of conditions in time (used only if condition=='all')
         """
 
         if condition == "all":
@@ -480,7 +481,12 @@ class Data:
 
             sns.barplot(data=df, y=stat, x="mouse", ax=ax[0])
 
-            sns.barplot(data=df, hue="condition", y=stat, x="mouse", ax=ax[1])
+            h_order = None
+            if conditions_order:
+                h_order = get_order(list(conditions_order.values()))
+            sns.barplot(
+                data=df, hue="condition", y=stat, x="mouse", ax=ax[1], hue_order=h_order
+            )
 
             plt.legend(loc="upper right")
         else:
@@ -526,3 +532,33 @@ def q5(x):
     :return: 5-quantile
     """
     return x.quantile(0.05)
+
+
+def get_order(orders):
+    """
+    Function for creating general condition order from several
+    :param orders: list of several condition orders
+    :return: list of general condition order
+    """
+    prev = {}
+    for x in orders:
+        for i, y in enumerate(x):
+            ptr = prev.get(y, [])
+            ptr.extend(x[:i])
+            prev[y] = ptr
+
+    prev_all = {}
+    for key, val in prev.items():
+        ptr = []
+        for y in val:
+            ptr.append(y)
+            ptr.extend(prev[y])
+        prev_all[key] = set(ptr)
+
+    order = []
+    for key, val in prev_all.items():
+        order.append([val, key])
+
+    order.sort(key=lambda x: len(x[0]))
+
+    return [x[1] for x in order]
