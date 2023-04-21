@@ -91,20 +91,20 @@ class DistanceAnalysis:
 
         sns.boxplot(data=df, x="r", y="date", ax=ax1)
         ax1.set_ylabel("Session", fontsize=16)
-        ax1.set_xlabel("Value", fontsize=16)
+        ax1.set_xlabel("Rho distance, pixels", fontsize=16)
         ax1.set_title(f"Rho distribution", fontsize=18)
         ax1.tick_params(axis="both", labelsize=14)
 
         ax2 = fig.add_subplot(gs[1:, :2])
         sns.scatterplot(data=df, x="r", y="mean_sig", ax=ax2)
-        ax2.set_xlabel("rho", fontsize=16)
+        ax2.set_xlabel("Rho distance, pixels", fontsize=16)
         ax2.set_ylabel(f"Signal mean", fontsize=16)
         ax2.set_title(f"Scatterplot", fontsize=18)
         ax2.tick_params(axis="both", labelsize=14)
 
         ax3 = fig.add_subplot(gs[1:, 2:])
         sns.scatterplot(data=df, x="r", y="active_ratio", ax=ax3)
-        ax3.set_xlabel("rho", fontsize=16)
+        ax3.set_xlabel("Rho distance, pixels", fontsize=16)
         ax3.set_ylabel(f"Active ratio", fontsize=16)
         ax3.set_title(f"Scatterplot", fontsize=18)
         ax3.tick_params(axis="both", labelsize=14)
@@ -154,7 +154,7 @@ class DistanceAnalysis:
         plt.figure(figsize=(8, 6))
         sns.boxplot(data=self.distance_df, x=dist_type, y="date")
 
-        plt.xlabel("Distance", fontsize=16)
+        plt.xlabel("Distance, pixels", fontsize=16)
         plt.ylabel("Session", fontsize=16)
         plt.title(f"{dist_type} distance", fontsize=18)
         plt.tick_params(axis="both", labelsize=14)

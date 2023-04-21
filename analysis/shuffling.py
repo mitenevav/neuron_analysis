@@ -161,19 +161,19 @@ class ShuffleAnalysis:
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 
-        ax[0].set_title("Размах", fontsize=16)
+        ax[0].set_title("Correlation range", fontsize=16)
         sns.barplot(data=ptp, hue="model", x="date", y="values", ax=ax[0])
         ax[0].tick_params(axis="x", rotation=45)
         ax[0].tick_params(axis="both", labelsize=13)
-        ax[0].set_ylabel("Размах", fontsize=14)
-        ax[0].set_xlabel("Дата", fontsize=14)
+        ax[0].set_ylabel("Range", fontsize=14)
+        ax[0].set_xlabel("Session", fontsize=14)
 
-        ax[1].set_title("Разность размаха", fontsize=16)
+        ax[1].set_title("Change of range", fontsize=16)
         sns.barplot(data=diff, x="date", y="values", ax=ax[1])
         ax[1].tick_params(axis="x", rotation=45)
         ax[1].tick_params(axis="both", labelsize=13)
-        ax[1].set_ylabel("Разность", fontsize=14)
-        ax[1].set_xlabel("Дата", fontsize=14)
+        ax[1].set_ylabel("Change", fontsize=14)
+        ax[1].set_xlabel("Session", fontsize=14)
 
         plt.show()
 
@@ -207,19 +207,19 @@ class ShuffleAnalysis:
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 
-        ax[0].set_title("Максимум", fontsize=16)
+        ax[0].set_title(f"{stat_type} maximum", fontsize=16)
         sns.barplot(data=maximum, hue="model", x="date", y="values", ax=ax[0])
         ax[0].tick_params(axis="x", rotation=45)
         ax[0].tick_params(axis="both", labelsize=13)
-        ax[0].set_ylabel("Максимум", fontsize=14)
-        ax[0].set_xlabel("Дата", fontsize=14)
+        ax[0].set_ylabel(f"{stat_type} maximum value", fontsize=14)
+        ax[0].set_xlabel("Session", fontsize=14)
 
-        ax[1].set_title("Среднее", fontsize=16)
+        ax[1].set_title(f"{stat_type} mean", fontsize=16)
         sns.barplot(data=mean, hue="model", x="date", y="values", ax=ax[1])
         ax[1].tick_params(axis="x", rotation=45)
         ax[1].tick_params(axis="both", labelsize=13)
-        ax[1].set_ylabel("Среднее", fontsize=14)
-        ax[1].set_xlabel("Дата", fontsize=14)
+        ax[1].set_ylabel(f"{stat_type} mean value", fontsize=14)
+        ax[1].set_xlabel("Session", fontsize=14)
 
         plt.show()
 
@@ -230,17 +230,17 @@ class ShuffleAnalysis:
         """
         fig, ax = plt.subplots(2, 1, figsize=(15, 10))
 
-        ax[0].set_title("Исходные данные", fontsize=20)
+        ax[0].set_title("Original data", fontsize=20)
         sns.heatmap(self.original_data[date].active_state_df, cbar=False, ax=ax[0])
         ax[0].set_xticks([])
         ax[0].set_yticks([])
-        ax[0].set_ylabel("Нейроны", fontsize=18)
+        ax[0].set_ylabel("Neurons", fontsize=18)
 
-        ax[1].set_title("Перемешанные данные", fontsize=20)
+        ax[1].set_title("Shuffled data", fontsize=20)
         sns.heatmap(self.shuffled_data[date].active_state_df, cbar=False, ax=ax[1])
         ax[1].set_yticks([])
         ax[1].set_xticks([])
-        ax[1].set_xlabel("Время \u2192", fontsize=18)
-        ax[1].set_ylabel("Нейроны", fontsize=18)
+        ax[1].set_xlabel("Time \u2192", fontsize=18)
+        ax[1].set_ylabel("Neurons", fontsize=18)
 
         plt.show()

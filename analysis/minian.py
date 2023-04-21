@@ -711,7 +711,7 @@ class MinianAnalysis:
                 thr = dissimilarity[dissimilarity < 1].max()
 
         clusters = fcluster(
-            hierarchy, np.quantile(dissimilarity, 0.2), criterion="distance"
+            hierarchy, thr, criterion="distance"
         )
         clusters = [[col, cl] for col, cl in zip(corr_df.columns, clusters)]
         clusters.sort(key=lambda x: x[1])
@@ -789,8 +789,8 @@ class MinianAnalysis:
         plt.figure(figsize=(8, 6))
         plt.title("Network degree", fontsize=17)
         sns.lineplot(data=nd_df, x="threshold", y=f"nd_{method}")
-        plt.xlabel(f"threshold", fontsize=16)
-        plt.ylabel("network degree", fontsize=16)
+        plt.xlabel("threshold", fontsize=16)
+        plt.ylabel("correlation coefficient value", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -804,12 +804,13 @@ class MinianAnalysis:
         nd_df = self.get_network_degree(method, thr)
         nd_df.to_excel(self.results_folder + f"/network_degree_{method}.xlsx")
 
-    def get_connectivity(self, method="signal", thr=None):
+    def get_connectivity(self, method="signal", thr=None, position=False):
         """
         Function for computing connectivity
         Connectivity - share of strong connections for each neuron
         :param method: method of correlation
         :param thr: threshold for strong correlation between neurons
+        :param position: consideration of spatial position
         :return: connectivity
         """
         if not thr:
@@ -823,7 +824,7 @@ class MinianAnalysis:
             thr = m[method]
 
         df_conn = pd.DataFrame()
-        corr = self.get_correlation(method=method)
+        corr = self.get_correlation(method=method, position=position)
         df_conn[f"connectivity_{method}"] = ((corr > thr).sum() - 1) / len(corr)
         return df_conn
 
@@ -837,8 +838,8 @@ class MinianAnalysis:
         plt.figure(figsize=(8, 6))
         plt.title("Connectivity", fontsize=17)
         sns.histplot(data=conn_df, x=f"connectivity_{method}", bins=8, stat="percent")
-        plt.xlabel(f"connectivity", fontsize=16)
-        plt.ylabel("percent", fontsize=16)
+        plt.xlabel("percent of correlated neurons", fontsize=16)
+        plt.ylabel("percent of neurons", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()

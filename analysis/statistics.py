@@ -150,7 +150,7 @@ class StatTests:
             )
             plt.title("Correlation distribution", fontsize=17)
             plt.xlabel("type", fontsize=16)
-            plt.ylabel("Correlation", fontsize=16)
+            plt.ylabel("Correlation coefficient", fontsize=16)
             plt.xticks(fontsize=14)
             plt.yticks(fontsize=14)
             plt.legend(fontsize=16)
@@ -173,7 +173,7 @@ class StatTests:
                 sns.histplot(df.T, stat="percent", bins=20, ax=ax)
 
                 ax.set_title(f"Correlation distribution {t}", fontsize=17)
-                ax.set_xlabel("Correlation", fontsize=16)
+                ax.set_xlabel("Correlation coefficient", fontsize=16)
                 ax.set_ylabel("Density", fontsize=16)
                 ax.tick_params(axis="both", labelsize=14)
             plt.show()
@@ -192,7 +192,7 @@ class StatTests:
                     )
 
                 ax.set_title(f"Correlation distribution {t}", fontsize=17)
-                ax.set_xlabel("Correlation", fontsize=16)
+                ax.set_xlabel("Correlation coefficient", fontsize=16)
                 ax.set_ylabel("Density", fontsize=16)
                 ax.tick_params(axis="both", labelsize=14)
                 ax.legend(fontsize=16)
@@ -345,7 +345,7 @@ class StatTests:
                 )
 
             ax.set_title(f"{name} distribution", fontsize=17)
-            ax.set_xlabel(name, fontsize=16)
+            ax.set_xlabel(f"{name} value", fontsize=16)
             ax.set_ylabel("Density", fontsize=16)
             ax.tick_params(axis="both", labelsize=14)
             ax.legend(fontsize=16)
@@ -354,12 +354,12 @@ class StatTests:
 
     def show_degree_of_network(self, interval=(0, 1), step=0.01, position=False):
         """
-        Function for plotting degree_of_network
+        Function for plotting network degree
         :param interval: range of x-axis
         :param step: step on x-axis
         :param position: consideration of spatial position
         """
-        degree_of_network = self.get_degree_of_network(interval, step, position)
+        degree_of_network = self.get_network_degree(interval, step, position)
 
         fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
@@ -369,9 +369,9 @@ class StatTests:
             corr_types = self.base_correlations
 
         for corr_type, ax in zip(corr_types, axs.flatten()):
-            ax.set_xlabel("Network threshold", fontsize=16)
-            ax.set_ylabel("Network degree", fontsize=16)
-            ax.set_title(f"Degree of network ({corr_type})", fontsize=18)
+            ax.set_xlabel("Threshold", fontsize=16)
+            ax.set_ylabel("Correlation coefficient value", fontsize=16)
+            ax.set_title(f"Network degree ({corr_type})", fontsize=18)
             ax.tick_params(axis="both", labelsize=14)
             thrs = np.arange(interval[0], interval[1], step)
             for date in self.params:
@@ -385,13 +385,13 @@ class StatTests:
             ax.legend(fontsize=15)
         plt.show()
 
-    def get_degree_of_network(self, interval=(0, 1), step=0.01, position=False):
+    def get_network_degree(self, interval=(0, 1), step=0.01, position=False):
         """
-        Function for computing degree of network
+        Function for computing network degree
         :param interval: range of x-axis
         :param step: step on x-axis
         :param position: consideration of spatial position
-        :return: dict with degree of network
+        :return: dict with network degree
         """
         degree_of_network = {}
 
@@ -410,13 +410,13 @@ class StatTests:
             degree_of_network[corr_type] = values
         return degree_of_network
 
-    def show_distribution_of_network_degree(self, q=0.9, position=False):
+    def show_distribution_of_connectivity(self, q=0.9, position=False):
         """
-        Function for plotting distribution of network degree
+        Function for plotting distribution of connectivity
         :param q: quantile level for all values of this type, the value of which will be the threshold value
         :param position: consideration of spatial position
         """
-        degree_distribution = self.get_distribution_of_network_degree(q, position)
+        degree_distribution = self.get_distribution_of_connectivity(q, position)
         fig, axs = plt.subplots(2, 2, figsize=(18, 15))
 
         if position:
@@ -425,16 +425,16 @@ class StatTests:
             corr_types = self.base_correlations
 
         for corr_type, ax in zip(corr_types, axs.flatten()):
-            ax.set_xlabel("Network degree", fontsize=16)
-            ax.set_ylabel("Coactive units degree", fontsize=16)
-            ax.set_title(f"Distribution of network degree ({corr_type})", fontsize=18)
+            ax.set_xlabel("Percent of correlated neurons", fontsize=16)
+            ax.set_ylabel("Percent of neurons", fontsize=16)
+            ax.set_title(f"Distribution of connectivity ({corr_type})", fontsize=18)
             ax.tick_params(axis="both", labelsize=14)
             for date in self.params:
                 degree = degree_distribution[corr_type][date]
                 num_of_neurons = len(self.corr_dfs[date][corr_type])
                 sns.lineplot(
                     x=degree.index / num_of_neurons,
-                    y=degree / num_of_neurons,
+                    y=degree,
                     lw=2.2,
                     label=f"{date} - {num_of_neurons} neurons",
                     ax=ax,
@@ -443,12 +443,12 @@ class StatTests:
             ax.legend(fontsize=15)
         plt.show()
 
-    def get_distribution_of_network_degree(self, q=0.9, position=False):
+    def get_distribution_of_connectivity(self, q=0.9, position=False):
         """
-        Function for computing distribution of network degree
+        Function for computing distribution of connectivity
         :param q: quantile level for all values of this type, the value of which will be the threshold value
         :param position: consideration of spatial position
-        :return: number of coactive neurons for each other
+        :return: share of coactive neurons for each other
         """
         if position:
             corr_types = [x + "_position" for x in self.base_correlations]
@@ -466,7 +466,7 @@ class StatTests:
             degrees = {}
             for date in self.params:
                 corr_df = self.corr_dfs[date][corr_type]
-                degree = ((corr_df > thr).sum() - 1).value_counts().sort_index()
+                degree = ((corr_df > thr).sum() - 1).value_counts().sort_index() / len(corr_df)
                 degrees[date] = degree
 
             degree_distribution[corr_type] = degrees
@@ -513,7 +513,7 @@ class StatTests:
         :param step: step on x-axis
         :param position: consideration of spatial position
         """
-        data = self.get_degree_of_network(
+        data = self.get_network_degree(
             interval=interval, step=step, position=position
         )
         return self.__wilcoxon_test(data)
@@ -524,5 +524,5 @@ class StatTests:
         :param q: quantile level for all values of this type, the value of which will be the threshold value
         :param position: consideration of spatial position
         """
-        data = self.get_distribution_of_network_degree(q=q, position=position)
+        data = self.get_distribution_of_connectivity(q=q, position=position)
         return self.__distr_test(data)
