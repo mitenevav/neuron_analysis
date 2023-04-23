@@ -144,21 +144,30 @@ class DistanceAnalysis:
 
         return df
 
-    def plot_distance_distribution(self, dist_type="euclidean"):
+    def plot_distance_distribution(self, dist_type="euclidean", thr=-1):
         """
         Function for plotting distance distribution
         :param dist_type: type of distance
                 * 'euclidean'
                 * 'radial'
+        :param thr: correlation threshold for visualization
         """
-        plt.figure(figsize=(8, 6))
-        sns.boxplot(data=self.distance_df, x=dist_type, y="date")
+        df = self.distance_df[self.distance_df['active'] >= thr]
 
-        plt.xlabel("Distance, pixels", fontsize=16)
-        plt.ylabel("Session", fontsize=16)
-        plt.title(f"{dist_type} distance", fontsize=18)
-        plt.tick_params(axis="both", labelsize=14)
-        plt.show()
+        if len(df) > 0:
+            plt.figure(figsize=(8, 6))
+
+            sns.boxplot(data=df, x=dist_type, y="date")
+
+            plt.xlabel("Distance, pixels", fontsize=16)
+            plt.ylabel("Session", fontsize=16)
+            plt.title(f"{dist_type} distance", fontsize=18)
+            plt.tick_params(axis="both", labelsize=14)
+
+            plt.show()
+        else:
+            print('There is no data for the selected parameters')
+
 
     def plot_dependency(self, x, y):
         """
