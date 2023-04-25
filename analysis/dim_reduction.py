@@ -33,15 +33,16 @@ class Data:
         self.disable_verbose = not verbose
         self.params = sessions
         self.data_reduced = None
+        self.path_to_data = path_to_data
 
         self.models = {}
         for date in tqdm(self.sessions, disable=self.disable_verbose):
             session_path = self.params[date]["path"]
             ma = MinianAnalysis(
-                f"{path_to_data}/{session_path}/minian/", self.params[date]["fps"]
+                f"{self.path_to_data}/{session_path}/minian/", self.params[date]["fps"]
             )
             ma.active_state_df = pd.read_excel(
-                f"{path_to_data}/{session_path}/results/active_states_spike.xlsx",
+                f"{self.path_to_data}/{session_path}/results/active_states_spike.xlsx",
                 index_col=0,
             ).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
@@ -505,6 +506,14 @@ class Data:
         :return: list of statistics
         """
         return self.data.columns.tolist()
+
+    def save_results(self, path):
+        """
+        Function for saving all data
+        :param path: path to target folder
+        """
+        self.data.to_excel(path + '/all_data.xlsx')
+        self.data_reduced.to_excel(path + '/reduced_data.xlsx')
 
 
 def iqr(x):

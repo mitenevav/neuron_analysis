@@ -352,7 +352,7 @@ class StatTests:
 
         plt.show()
 
-    def show_degree_of_network(self, interval=(0, 1), step=0.01, position=False):
+    def show_network_degree(self, interval=(0, 1), step=0.01, position=False):
         """
         Function for plotting network degree
         :param interval: range of x-axis
@@ -506,7 +506,7 @@ class StatTests:
         )
         return dist_tets
 
-    def get_connectivity_test(self, interval=(0, 1), step=0.01, position=False):
+    def get_nd_test(self, interval=(0, 1), step=0.01, position=False):
         """
         Function for testing network degree identity
         :param interval: range of x-axis
