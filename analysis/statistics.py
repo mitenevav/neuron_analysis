@@ -466,7 +466,9 @@ class StatTests:
             degrees = {}
             for date in self.params:
                 corr_df = self.corr_dfs[date][corr_type]
-                degree = ((corr_df > thr).sum() - 1).value_counts().sort_index() / len(corr_df)
+                degree = ((corr_df > thr).sum() - 1).value_counts().sort_index() / len(
+                    corr_df
+                )
                 degrees[date] = degree
 
             degree_distribution[corr_type] = degrees
@@ -513,9 +515,7 @@ class StatTests:
         :param step: step on x-axis
         :param position: consideration of spatial position
         """
-        data = self.get_network_degree(
-            interval=interval, step=step, position=position
-        )
+        data = self.get_network_degree(interval=interval, step=step, position=position)
         return self.__wilcoxon_test(data)
 
     def get_connectivity_distr_test(self, q=0.9, position=False):

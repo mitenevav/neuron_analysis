@@ -141,7 +141,7 @@ class DistanceAnalysis:
             df = df.append(day_df)
 
         df = df.reset_index(drop=True)
-
+        df.index.name = 'pair_number'
         return df
 
     def plot_distance_distribution(self, dist_type="euclidean", thr=-1):
@@ -152,7 +152,7 @@ class DistanceAnalysis:
                 * 'radial'
         :param thr: correlation threshold for visualization
         """
-        df = self.distance_df[self.distance_df['active'] >= thr]
+        df = self.distance_df[self.distance_df["active"] >= thr]
 
         if len(df) > 0:
             plt.figure(figsize=(8, 6))
@@ -166,8 +166,7 @@ class DistanceAnalysis:
 
             plt.show()
         else:
-            print('There is no data for the selected parameters')
-
+            print("There is no data for the selected parameters")
 
     def plot_dependency(self, x, y):
         """
