@@ -710,9 +710,7 @@ class MinianAnalysis:
             if thr == 1:
                 thr = dissimilarity[dissimilarity < 1].max()
 
-        clusters = fcluster(
-            hierarchy, thr, criterion="distance"
-        )
+        clusters = fcluster(hierarchy, thr, criterion="distance")
         clusters = [[col, cl] for col, cl in zip(corr_df.columns, clusters)]
         clusters.sort(key=lambda x: x[1])
 

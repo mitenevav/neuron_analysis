@@ -438,14 +438,14 @@ class Data:
             ]
 
             df = df.groupby(["mouse", "condition"]).mean()
-            feat_std = df.reset_index().groupby("mouse").mad().mean().sort_values()
+            feat_mad = df.reset_index().groupby("mouse").mad().mean().sort_values()
         else:
             df = df.groupby("mouse").mean()
-            feat_std = df.mad().sort_values()
+            feat_mad = df.mad().sort_values()
 
         plt.figure(figsize=(7, 6))
-        plt.barh(feat_std[:topn].index, feat_std[:topn])
-        plt.barh(feat_std[-topn:].index, feat_std[-topn:])
+        plt.barh(feat_mad[:topn].index, feat_mad[:topn])
+        plt.barh(feat_mad[-topn:].index, feat_mad[-topn:])
         plt.show()
 
     def show_stat(self, stat, condition="all", conditions_order=None):
@@ -512,8 +512,8 @@ class Data:
         Function for saving all data
         :param path: path to target folder
         """
-        self.data.to_excel(path + '/all_data.xlsx')
-        self.data_reduced.to_excel(path + '/reduced_data.xlsx')
+        self.data.to_excel(path + "/all_data.xlsx")
+        self.data_reduced.to_excel(path + "/reduced_data.xlsx")
 
 
 def iqr(x):
