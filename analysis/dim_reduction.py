@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from sklearn.decomposition import PCA
@@ -66,7 +67,7 @@ class Data:
             desc="Step 1/6: Burst rate computing...",
         ):
             df_ptr = pd.DataFrame()
-            df_ptr["br"] = self.models[date].burst_rate()["activations per min"]
+            df_ptr["burst_rate"] = self.models[date].burst_rate()["activations per min"]
             df_ptr["model"] = date
             df_br = df_br.append(df_ptr)
 
@@ -86,7 +87,9 @@ class Data:
             desc="Step 2/6: Network spike peak computing...",
         ):
             df_ptr = pd.DataFrame()
-            df_ptr["nsp"] = self.models[date].network_spike_peak(1).T["peak"]
+            df_ptr["network_spike_peak"] = (
+                self.models[date].network_spike_peak(1).T["peak"]
+            )
             df_ptr["model"] = date
             df_nsp = df_nsp.append(df_ptr)
 
@@ -106,7 +109,9 @@ class Data:
             desc="Step 3/6: Network spike rate computing...",
         ):
             df_ptr = pd.DataFrame()
-            df_ptr["nsr"] = self.models[date].network_spike_rate(1).T["spike rate"]
+            df_ptr["network_spike_rate"] = (
+                self.models[date].network_spike_rate(1).T["spike rate"]
+            )
             df_ptr["model"] = date
             df_nsr = df_nsr.append(df_ptr)
 
@@ -147,9 +152,11 @@ class Data:
         df_network_degree = pd.DataFrame()
         for date in self.sessions:
             df_ptr = pd.DataFrame()
-            corr = np.array(df_corr[df_corr["model"] == date][f"corr_{method}"])
+            corr = np.array(df_corr[df_corr["model"] == date][f"correlation_{method}"])
             for thr in thrs:
-                df_ptr[f"nd_{method}_{thr}"] = [(corr > thr).sum() / len(corr)]
+                df_ptr[f"network_degree_{method}_thr_{thr}"] = [
+                    (corr > thr).sum() / len(corr)
+                ]
             df_ptr["model"] = date
             df_network_degree = df_network_degree.append(df_ptr)
 
@@ -225,7 +232,7 @@ class Data:
                 [
                     pd.DataFrame(
                         {
-                            f"corr_{corr}": corr_df_to_distribution(corr_tmp[x]),
+                            f"correlation_{corr}": corr_df_to_distribution(corr_tmp[x]),
                             "model": x,
                         }
                     )
@@ -363,7 +370,7 @@ class Data:
         for cond, color in zip(condition_order, palette):
             palette_dict[cond] = color
 
-        plt.figure(figsize=(9, 8))
+        fig = plt.figure(figsize=(9, 8))
 
         data_mouse = data[data["mouse"] == mouse]
         plt.title(f"Mouse {mouse}", fontsize=18)
@@ -408,6 +415,11 @@ class Data:
                 color=palette_dict[end_cond],
                 zorder=1,
             )
+
+        formatter = mpl.ticker.StrMethodFormatter("{x:.1f}")
+
+        fig.axes[0].xaxis.set_major_formatter(formatter)
+        fig.axes[0].yaxis.set_major_formatter(formatter)
 
         plt.tick_params(axis="both", labelsize=14)
 

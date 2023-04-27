@@ -358,7 +358,7 @@ class MinianAnalysis:
             sns.barplot(data=burst_rate, x="activations per min", y="percent")
 
         plt.xlabel("activations per min", fontsize=16)
-        plt.ylabel("percent", fontsize=16)
+        plt.ylabel("percent of neurons", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -374,7 +374,7 @@ class MinianAnalysis:
         plt.title("Network spike rate", fontsize=17)
         sns.histplot(data=nsr.T, x="spike rate", stat="percent")
         plt.xlabel(f"percentage of active neurons per {period} second", fontsize=16)
-        plt.ylabel("percent", fontsize=16)
+        plt.ylabel("percent of time", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -406,7 +406,7 @@ class MinianAnalysis:
         plt.title("Network spike peak", fontsize=17)
         sns.histplot(data=nsp_df.T, x="peak", bins=8, stat="percent")
         plt.xlabel(f"max percentage of active neurons per {period} second", fontsize=16)
-        plt.ylabel("percent", fontsize=16)
+        plt.ylabel("percent of time", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
@@ -640,7 +640,8 @@ class MinianAnalysis:
             c += 1
 
         sns.histplot(corr, stat="percent", ax=ax[0][0])
-        ax[0][0].set_ylabel("percent", fontsize=20)
+        ax[0][0].set_ylabel("Percent of connections", fontsize=20)
+        ax[0][0].set_xlabel("Correlation coefficient", fontsize=20)
         ax[0][0].set_title(f"Correlation distribution for {method} method", fontsize=24)
 
         clusters = self.get_corr_clustering(corr_df)
@@ -687,6 +688,9 @@ class MinianAnalysis:
             c += 1
 
         ax[0][1].scatter(x=self.positions["y"], y=self.positions["x"], s=100, zorder=4)
+        ax[0][1].set_ylabel("pixels", fontsize=16)
+        ax[0][1].set_xlabel("pixels", fontsize=16)
+
         plt.show()
 
     @staticmethod
