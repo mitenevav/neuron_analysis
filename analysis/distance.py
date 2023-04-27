@@ -141,7 +141,7 @@ class DistanceAnalysis:
             df = df.append(day_df)
 
         df = df.reset_index(drop=True)
-        df.index.name = 'pair_number'
+        df.index.name = "pair_number"
         return df
 
     def plot_distance_distribution(self, dist_type="euclidean", thr=-1):
@@ -182,8 +182,18 @@ class DistanceAnalysis:
 
         sns.scatterplot(data=self.distance_df, x=x, y=y, hue="date")
 
-        plt.xlabel(x, fontsize=16)
-        plt.ylabel(y, fontsize=16)
-        plt.title(f"Dependency between {x} and {y}", fontsize=18)
+        axs = [x, y]
+
+        distances = ["euclidean", "radial"]
+        correlations = ["signal", "active", "active_acc"]
+
+        for i, ax in enumerate(axs):
+            if ax in distances:
+                axs[i] = ax + " distance, pixels"
+            else:
+                axs[i] = f"correlation coefficient ({ax})"
+
+        plt.xlabel(axs[0], fontsize=16)
+        plt.ylabel(axs[1], fontsize=16)
         plt.tick_params(axis="both", labelsize=14)
         plt.show()
