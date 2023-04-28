@@ -194,6 +194,24 @@ class MinianHandlerWidgets:
         display(wid)
 
     @staticmethod
+    def network_spike_duration(model, thresholds):
+        """
+        Function for creating UI for network spike duration
+        :param model: MinianHandler class
+        :param thresholds: threshold values in percentages
+        """
+        button = widgets.Button(description="Save", button_style="success")
+
+        def save_network_spike_duration(b):
+            model.save_network_spike_duration(thresholds)
+
+        button.on_click(save_network_spike_duration)
+
+        display(button)
+
+        model.show_network_spike_duration(thresholds)
+
+    @staticmethod
     def correlation(model):
         """
         Function for creating UI for correlation
@@ -726,6 +744,23 @@ class DistanceAnalysisWidgets:
 
         display(widgets.HBox([distance, threshold]))
         display(out)
+
+    @staticmethod
+    def save(model, path):
+        """
+        Function for creating UI for saving
+        :param model: DistanceAnalysis class
+        :param path: path to target folder
+        """
+        button = widgets.Button(description="Save", button_style="success")
+
+        def on_button_clicked(b):
+            print("Saving...")
+            model.save_results(path)
+            print("Done!")
+
+        button.on_click(on_button_clicked)
+        display(button)
 
 
 def save_df_button(df, path):

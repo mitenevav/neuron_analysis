@@ -289,7 +289,7 @@ class MinianAnalysis:
 
         return nsr
 
-    def network_spike_duration(self, thresholds, verbose=True):
+    def network_spike_duration(self, thresholds, verbose=False):
         """
         Function for computing network spike duration
         Network spike duration - duration when the percentage of active cells is above the set thresholds
@@ -306,7 +306,7 @@ class MinianAnalysis:
         nsd_df = pd.DataFrame(
             {
                 "percentage": thresholds,
-                "Network spike duration": np.array(spike_durations) / self.fps,
+                "Network spike duration": np.array(spike_durations) / len(vals),
             }
         )
         return nsd_df
@@ -387,7 +387,7 @@ class MinianAnalysis:
         """
         nsd_df = self.network_spike_duration(thresholds)
         plt.figure(figsize=(8, 6))
-        plt.title("Network spike duration", fontsize=17)
+        plt.title("percentage of time", fontsize=17)
         sns.barplot(data=nsd_df, x="percentage", y="Network spike duration")
         plt.xlabel("percentage of active neurons", fontsize=16)
         plt.ylabel("seconds", fontsize=16)
