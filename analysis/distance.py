@@ -36,7 +36,8 @@ class DistanceAnalysis:
         for date in self.dates:
             ma = MinianAnalysis(f"{self.path_to_data}/{date}/minian/", fps)
             ma.active_state_df = pd.read_excel(
-                f"{self.path_to_data}/{date}/results/active_states_spike.xlsx", index_col=0
+                f"{self.path_to_data}/{date}/results/active_states_spike.xlsx",
+                index_col=0,
             ).astype(bool)
             ma.active_state = active_df_to_dict(ma.active_state_df)
             self.models[date] = ma
@@ -204,12 +205,12 @@ class DistanceAnalysis:
         Function for saving all data
         :param path: path to target folder
         """
-        self.distance_df.to_excel(path+'/distance_analysis_df.xlsx')
+        self.distance_df.to_excel(path + "/distance_analysis_df.xlsx")
 
         positions_df = pd.DataFrame()
         for key, model in self.models.items():
             ptr_df = model.positions.reset_index()
-            ptr_df['model'] = key
+            ptr_df["model"] = key
             positions_df = positions_df.append(ptr_df)
 
-        positions_df.to_excel(path+'/position_analysis_df.xlsx')
+        positions_df.to_excel(path + "/position_analysis_df.xlsx")

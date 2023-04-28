@@ -387,10 +387,10 @@ class MinianAnalysis:
         """
         nsd_df = self.network_spike_duration(thresholds)
         plt.figure(figsize=(8, 6))
-        plt.title("percentage of time", fontsize=17)
+        plt.title("Network spike duration", fontsize=17)
         sns.barplot(data=nsd_df, x="percentage", y="Network spike duration")
         plt.xlabel("percentage of active neurons", fontsize=16)
-        plt.ylabel("seconds", fontsize=16)
+        plt.ylabel("percent of time", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
