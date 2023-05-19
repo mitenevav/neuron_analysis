@@ -26,4 +26,4 @@ After this steps, the joined Jupiter Notebook, containing separated notebooks, w
 * MultipleShuffling
 * Dimensionality reduction
 
-A detailed guide to these notebooks is [here]().
+A detailed guide to these notebooks is [here](docs/tutorial.pdf).
