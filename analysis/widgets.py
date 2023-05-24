@@ -654,10 +654,11 @@ class DataWidgets:
         display(stats_deviation)
 
     @staticmethod
-    def show_stats_deviation(model):
+    def stats_deviation(model, path):
         """
         Function for creating UI for show_stats_deviation
         :param model: Data class
+        :param path: path to target folder
         """
 
         condition = widgets.Dropdown(
@@ -670,7 +671,19 @@ class DataWidgets:
         stats_deviation = widgets.interactive_output(
             model.show_stats_deviation, {"condition": condition}
         )
-        display(condition)
+
+        button = widgets.Button(description="Save", button_style="success")
+
+        def save_stats_deviation(b):
+            print("Saving...")
+            model.save_stats_deviation(path=path)
+            print("Done!")
+
+        button.on_click(save_stats_deviation)
+
+        center_box = widgets.HBox([condition, button])
+
+        display(center_box)
         display(stats_deviation)
 
     @staticmethod
