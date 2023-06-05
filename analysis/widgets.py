@@ -1,5 +1,7 @@
 import ipywidgets as widgets
 from IPython.display import display
+import itertools
+from tqdm.notebook import tqdm
 
 
 class ActiveStateAnalyzerWidgets:
@@ -270,8 +272,10 @@ class ActiveStateAnalyzerWidgets:
         :param model: ActiveStateAnalyzer class
         """
 
+        all_methods = ["signal", "diff", "active", "active_acc", "transfer_entropy"]
+
         corr_method = widgets.Dropdown(
-            options=["signal", "diff", "active", "active_acc", "transfer_entropy"]
+            options=all_methods
         )
 
         position = widgets.Checkbox(
@@ -288,9 +292,25 @@ class ActiveStateAnalyzerWidgets:
             print("Done!")
 
         button.on_click(save_correlation)
+
+        button2 = widgets.Button(description="Save all", button_style="success")
+
+        def save_all_correlation(b):
+            all_pos = [False, True]
+
+            for method, pos in tqdm(itertools.product(all_methods, all_pos),
+                                    total=len(all_methods)*len(all_pos),
+                                    desc="Saving..."
+                                    ):
+                model.save_correlation_matrix(
+                    method=method, position=pos
+                )
+
+        button2.on_click(save_all_correlation)
+
         first_line = widgets.HBox([corr_method, position])
 
-        display(widgets.VBox([first_line, button]))
+        display(widgets.VBox([first_line, button, button2]))
 
     @staticmethod
     def network_degree(model):
