@@ -1,7 +1,9 @@
 import ipywidgets as widgets
 from IPython.display import display
 import itertools
+import numpy as np
 from tqdm.notebook import tqdm
+from analysis.functions import stat_test
 
 
 class ActiveStateAnalyzerWidgets:
@@ -378,127 +380,143 @@ class ActiveStateAnalyzerWidgets:
 
 
 class StatisticWidgets:
-    """Class with notebook widgets for StatTests"""
+    """Class with notebook widgets for statistical test"""
+
+    tests = [
+        "t-test_ind",
+        "t-test_welch",
+        "t-test_paired",
+        "Mann-Whitney",
+        "Mann-Whitney-gt",
+        "Mann-Whitney-ls",
+        "Levene",
+        "Wilcoxon",
+        "Kruskal"
+    ]
+
+    plot_format = ["bar", "box"]
+
+    text_format = ["star", "simple", "full"]
 
     @staticmethod
-    def show_correlation_distribution(model):
+    def get_stat_test(data, features, hue):
         """
-        Function for creating UI for show_correlation_distribution
-        :param model: Statistic&Shuffling class
+        Function for creating UI for stat testing
+        :param data: DataFrame with data
+        :param features: list of features
+        :param hue: group column
         """
-        method = widgets.Dropdown(
-            options=["box", "hist", "kde"],
-            value="kde",
-            description="method",
+        test = widgets.Dropdown(
+            options=StatisticWidgets.tests,
+            value="Kruskal",
+            description="test",
             disabled=False,
         )
-        position = widgets.Checkbox(
-            value=False, description="Position", disabled=False, indent=False
+
+        text_format = widgets.Dropdown(
+            options=StatisticWidgets.text_format,
+            value="star",
+            description="text format",
+            disabled=False,
+        )
+
+        plot_format = widgets.Dropdown(
+            options=StatisticWidgets.plot_format,
+            value="bar",
+            description="plot format",
+            disabled=False,
+        )
+
+        feature = widgets.Dropdown(
+            options=features,
+            value=features[0],
+            description="feature",
+            disabled=False,
         )
 
         wid = widgets.interactive_output(
-            model.show_correlation_distribution,
-            {"method": method, "position": position},
+            stat_test,
+            {"data": widgets.fixed(data),
+             "x": widgets.fixed(hue),
+             "y": feature,
+             "test": test,
+             "text_format": text_format,
+             "kind": plot_format},
         )
 
-        display(widgets.HBox([method, position]))
+        col1 = widgets.VBox([feature, test])
+        col2 = widgets.VBox([text_format, plot_format])
+        display(widgets.HBox([col1, col2]))
         display(wid)
 
     @staticmethod
-    def get_test(model):
+    def show_features(model):
         """
-        Function for creating UI for get_test
-        :param model: StatTests class
+        Function for creating UI for feature testing
+        :param model: Data class
         """
-        return widgets.interact(
-            model.get_test,
-            data_type=widgets.Dropdown(
-                options=["corr", "stat"],
-                value="stat",
-                description="data type",
-                disabled=False,
-            ),
-            test_type=widgets.Dropdown(
-                options=["norm", "distr"],
-                value="distr",
-                description="test type",
-                disabled=False,
-            ),
-        )
+        features = model.data.columns.tolist()
+
+        data = model.data
+        data["condition"] = [
+            model.params[session]["condition"] for session in data.index
+        ]
+
+        StatisticWidgets.get_stat_test(data, features, "condition")
 
     @staticmethod
-    def show_distribution_of_connectivity(model):
+    def show_shuffling(model):
         """
-        Function for creating UI for show_distribution_of_connectivity
-        :param model: StatTests class
+        Function for creating UI for shuffling testing
+        :param model: MultipleShuffler class
         """
-        q = widgets.FloatSlider(
-            value=0.9,
-            min=0,
-            max=1,
-            step=0.01,
-            description="q",
-            continuous_update=False,
-            readout=True,
+        agg_stat = (
+            model.stat_df.groupby(["date", "shuffle_fraction", "attempt"])
+            .agg(["max", "mean", "std"])
+            .reset_index().
+            groupby(["date", "shuffle_fraction"])
+            .agg("mean")
+            .drop(columns=["attempt"])
         )
-        position = widgets.Checkbox(
-            value=False, description="Position", disabled=False, indent=False
+        agg_stat.columns = agg_stat.columns.map(' '.join)
+        agg_stat = agg_stat.reset_index()
+        agg_stat["shuffle_fraction"] = agg_stat["shuffle_fraction"].astype(str)
+
+        agg_corr = (
+            model.corr_df.groupby(["position", "date", "shuffle_fraction", "attempt"])
+            .agg(["mean", "std", np.ptp])
+            .reset_index()
+            .groupby(["position", "date", "shuffle_fraction"])
+            .agg("mean")
+            .drop(columns=["attempt"])
         )
 
-        wid = widgets.interactive_output(
-            model.show_distribution_of_connectivity, {"q": q, "position": position}
-        )
+        agg_corr.columns = agg_corr.columns.map(' '.join)
+        agg_corr = agg_corr.reset_index()
 
-        test = widgets.interact(
-            model.get_connectivity_distr_test, q=q, position=position
-        )
+        agg_corr["shuffle_fraction"] = agg_corr["shuffle_fraction"].astype(str)
+        agg_corr = agg_corr[~agg_corr['position']].drop(columns=["position"])
 
-        display(wid, test)
+        data = agg_stat.merge(agg_corr, on=['date', 'shuffle_fraction'])
+
+        features = data.drop(columns=['date', 'shuffle_fraction']).columns.tolist()
+        StatisticWidgets.get_stat_test(data, features, "shuffle_fraction")
 
     @staticmethod
-    def show_network_degree(model):
+    def show_distance(model):
         """
-        Function for creating UI for show_network_degree
-        :param model: StatTests class
+        Function for creating UI for distance testing
+        :param model: DistanceAnalysis class
         """
-        interval = widgets.FloatRangeSlider(
-            value=[0, 1],
-            min=0,
-            max=1,
-            step=0.001,
-            description="interval:",
-            disabled=False,
-            continuous_update=False,
-            orientation="horizontal",
-            readout=True,
-            readout_format=".3f",
-        )
+        data = model.distance_df
 
-        step = widgets.FloatSlider(
-            value=10e-3,
-            min=10e-4,
-            max=0.1,
-            step=10e-4,
-            description="step",
-            continuous_update=False,
-            readout=True,
-            readout_format=".3f",
-        )
+        data = data.rename(columns={'signal': 'signal correlation',
+                                    'active': 'active correlation',
+                                    'active_acc': 'active_acc correlation'})
 
-        position = widgets.Checkbox(
-            value=False, description="Position", disabled=False, indent=False
-        )
+        features = data.drop(columns=['date']).columns.tolist()
 
-        wid = widgets.interactive_output(
-            model.show_network_degree,
-            {"interval": interval, "step": step, "position": position},
-        )
-
-        test = widgets.interact(
-            model.get_nd_test, interval=interval, step=step, position=position
-        )
-
-        display(wid, test)
+        StatisticWidgets.get_stat_test(data, features, 'date')
 
 
 class ShufflingWidgets:
