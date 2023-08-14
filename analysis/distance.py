@@ -229,6 +229,10 @@ class DistanceAnalysis:
         positions_df = pd.DataFrame()
         for key, model in self.models.items():
             ptr_df = model.positions.reset_index()
+            ptr_df["signal_mean"] = model.signals.mean()
+            ptr_df["active_ratio"] = (
+                    model.active_state_df.sum() / len(model.active_state_df)
+            ).tolist()
             ptr_df["model"] = key
             positions_df = positions_df.append(ptr_df)
 
