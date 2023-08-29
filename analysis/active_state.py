@@ -387,6 +387,7 @@ class ActiveStateAnalyzer:
         :param thresholds: threshold values in percentages
         """
         nsd_df = self.network_spike_duration(thresholds)
+        nsd_df["Network spike duration"] *= 100
         plt.figure(figsize=(8, 6))
         plt.title("Network spike duration", fontsize=17)
         sns.barplot(data=nsd_df, x="percentage", y="Network spike duration")
@@ -793,7 +794,7 @@ class ActiveStateAnalyzer:
         plt.title("Network degree", fontsize=17)
         sns.lineplot(data=nd_df, x="threshold", y=f"nd_{method}")
         plt.xlabel("threshold", fontsize=16)
-        plt.ylabel("correlation coefficient value", fontsize=16)
+        plt.ylabel("number of co-active neurons, normalised", fontsize=16)
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.show()
