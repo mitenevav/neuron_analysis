@@ -109,24 +109,25 @@ class ShuffleAnalysis:
             corr = corr_df_to_distribution(
                 self.original_data[date].get_correlation(corr_type, position)
             )
-            df = df.append(
+            df = pd.concat([
+                df,
                 pd.DataFrame({"date": date, "model": "original", "values": corr})
-            )
+            ])
 
             corr = corr_df_to_distribution(
                 self.shuffled_data[date].get_correlation(corr_type, position)
             )
-            df = df.append(
+            df = pd.concat([
+                df,
                 pd.DataFrame({"date": date, "model": "shuffle", "values": corr})
-            )
+            ])
 
         df = df.fillna(0)
 
         ptp = df.groupby(["model", "date"]).agg({"values": np.ptp}).reset_index()
         diff = (
-            ptp.groupby(["date"]).agg({"model": list, "values": np.diff}).reset_index()
+            ptp.groupby(["date"]).agg({"model": list, "values": lambda x: -np.diff(x)[0]}).reset_index()
         )
-        diff["values"] = -diff["values"]
 
         fig, ax = plt.subplots(1, 2, figsize=(15, 5))
 
