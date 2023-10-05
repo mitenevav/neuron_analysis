@@ -11,6 +11,7 @@ from pyitlib.discrete_random_variable import entropy_conditional, entropy_joint
 from scipy.cluster.hierarchy import linkage, fcluster
 from analysis.functions import corr_df_to_distribution
 import itertools
+import  networkx as nx
 
 sns.set(color_codes=True)
 
@@ -617,7 +618,7 @@ class ActiveStateAnalyzer:
             )
         )
 
-    def show_corr(self, threshold, method="signal", position=False, lag=0):
+    def show_corr(self, threshold, method="signal", position=False, lag=0, resolution=1):
         """
         Function for plotting correlation distribution and map
         :param threshold: threshold for displayed correlation
@@ -628,6 +629,7 @@ class ActiveStateAnalyzer:
             active_acc - ratio of intersection to union of active states (depends on the chosen method for find_active_state)
         :param position: consideration of spatial position
         :param lag: lag radius (not used for 'active_acc' method)
+        :param resolution: resolution parameter for modularity
         """
         corr_df = self.get_correlation(method, position=position, lag=lag)
 
@@ -646,7 +648,7 @@ class ActiveStateAnalyzer:
         ax[0][0].set_xlabel("Correlation coefficient", fontsize=20)
         ax[0][0].set_title(f"Correlation distribution for {method} method", fontsize=24)
 
-        clusters = self.get_corr_clustering(corr_df)
+        clusters = self.get_corr_clustering(corr_df, resolution=resolution)
         cluster_corr_df = corr_df[clusters[:, 0]].loc[clusters[:, 0]]
         clusters = pd.DataFrame(clusters).groupby(1).agg(len)[0]
 
@@ -695,77 +697,148 @@ class ActiveStateAnalyzer:
 
         plt.show()
 
+
     @staticmethod
-    def get_corr_clustering(corr_df):
+    def create_graph(corr_df):
+        """
+        Function for creating correlation graph 
+        :param corr_df: dataframe with correlation values
+        :return: networkx graph
+        """
+        corr_df = corr_df.abs()
+        corr = corr_df.values
+        graph = nx.Graph()
+        cols = corr_df.columns.tolist()
+        for i in range(len(corr)):
+            for j in range(i+1, len(corr)):
+                graph.add_edge(cols[i], cols[j], weight=corr[i, j], length=1-corr[i, j])
+
+        return graph
+
+    @staticmethod
+    def get_corr_clustering(corr_df, resolution=1):
         """
         Function for getting correlation clusters
         :param corr_df: dataframe with correlation values
+        :param resolution: resolution parameter for modularity
         :return: 2d array, where 1 - unit id, 2 cluster id
         """
-        corr_df = (corr_df + corr_df.T) / 2
+        # corr_df = (corr_df + corr_df.T) / 2
 
-        dissimilarity = corr_df_to_distribution(
-            corr_df.abs().max().max() - corr_df.abs()
-        )
-        hierarchy = linkage(dissimilarity, method="average")
+        # dissimilarity = corr_df_to_distribution(
+        #     corr_df.abs().max().max() - corr_df.abs()
+        # )
+        # hierarchy = linkage(dissimilarity, method="average")
 
-        dissimilarity = np.array(dissimilarity)
-        thr = 0
-        if dissimilarity[dissimilarity < 1].sum() > 0:
-            thr = np.quantile(dissimilarity, 0.2)
-            if thr == 1:
-                thr = dissimilarity[dissimilarity < 1].max()
+        # dissimilarity = np.array(dissimilarity)
+        # thr = 0
+        # if dissimilarity[dissimilarity < 1].sum() > 0:
+        #     thr = np.quantile(dissimilarity, 0.2)
+        #     if thr == 1:
+        #         thr = dissimilarity[dissimilarity < 1].max()
 
-        clusters = fcluster(hierarchy, thr, criterion="distance")
-        clusters = [[col, cl] for col, cl in zip(corr_df.columns, clusters)]
-        clusters.sort(key=lambda x: x[1])
+        # clusters = fcluster(hierarchy, thr, criterion="distance")
+        # clusters = [[col, cl] for col, cl in zip(corr_df.columns, clusters)]
+        # clusters.sort(key=lambda x: x[1])
+
+        corr_df = corr_df.abs()
+        
+        graph = ActiveStateAnalyzer.create_graph(corr_df)
+
+        c = nx.community.greedy_modularity_communities(graph, weight='weight', resolution=resolution)
+        clusters = []
+        for i, x in enumerate(c):
+            for y in x:
+                clusters.append([y, i])
+
+        clusters = np.array(clusters)
 
         return np.array(clusters)
 
     @staticmethod
-    def get_cluster_stats(corr_df):
+    def get_cluster_stats(corr_df, resolution=1):
         """
         Function for computing stats in correlation clusters
         :param corr_df: dataframe with correlation values
-        :return: number of clusters, mean cluster size, mean intercluster distance, mean intracluster distance
+        :param resolution: resolution parameter for modularity
+        :return: dict with z-score(list), participation(list), centrality(list), global_efficiency(float), local_efficiency(float)
         """
-        clusters = ActiveStateAnalyzer.get_corr_clustering(corr_df)
+        corr_df = corr_df.abs()
+        l = len(corr_df)
+
+        graph = ActiveStateAnalyzer.create_graph(corr_df)
+        clusters = ActiveStateAnalyzer.get_corr_clustering(corr_df, resolution=resolution)
+
+        cl_idx = np.unique(clusters[:, 1])
 
         corr_df = corr_df[clusters[:, 0]].loc[clusters[:, 0]]
-        lens = pd.DataFrame(clusters).groupby(1).agg(len)[0]
 
-        intercluster_dist = []
-        for i, n in enumerate(lens[:-1]):
-            start_y = lens[:i].sum()
-            for j, m in enumerate(lens[i + 1 :], start=i + 1):
-                start_x = lens[:j].sum()
-                intercluster_dist.append(
-                    corr_df.values[start_y : start_y + n, start_x : start_x + m].mean()
-                )
+        cluster_stats = {}
 
-        intracluster_dist = []
-        for i, n in enumerate(lens):
-            start = lens[:i].sum()
-            corr_distr = corr_df_to_distribution(
-                corr_df.iloc[start : start + n].T.iloc[start : start + n]
-            )
-            intracluster_dist.append(np.mean(corr_distr) if len(corr_distr) > 0 else 1)
+        z_score = pd.Series(dtype='float64')
 
-        clusters_num = len(lens)
-        mean_cluster_size = lens.mean()
-        mean_intercluster_dist = (
-            np.mean(intercluster_dist) if len(intercluster_dist) > 0 else 0
-        )
-        mean_intracluster_dist = (
-            np.mean(intracluster_dist) if len(intracluster_dist) > 0 else 1
-        )
+        for x in cl_idx:
+            idxs = clusters[clusters[:, 1] == x][:, 0]
+            k = (corr_df[idxs].loc[idxs].sum() - 1) / (len(idxs) - 1)
+            z = (k - k.mean()) / k.std()
+            z_score = pd.concat([z_score, z])
 
-        return (
-            clusters_num,
-            mean_cluster_size,
-            mean_intercluster_dist,
-            mean_intracluster_dist,
-        )
+        cluster_stats['z_score'] = z_score.fillna(0).tolist()
+
+        participation = pd.Series(0, dtype='float64', index=corr_df.index)
+
+        for x in cl_idx:
+            idxs = clusters[clusters[:, 1] == x][:, 0]
+            k = corr_df[idxs].sum(axis=1)
+            k.loc[idxs] -= 1
+            participation += k ** 2
+
+        participation = 1 - participation / (corr_df.sum() - 1) ** 2
+
+        cluster_stats['participation'] = participation.tolist()
+
+        rows = []
+        idxs = []
+        for x in nx.shortest_path_length(graph, weight='length'):
+            rows.append(x[1])
+            idxs.append(x[0])
+
+        length_df = pd.DataFrame(rows, index=idxs)[idxs]
+
+        centrality = (l - 1) / length_df.sum()
+
+        cluster_stats['centrality'] = centrality.tolist()
+
+        g_efficiency = 0
+        for i, col in enumerate(length_df):
+            row = length_df[col].values
+            row = np.hstack([row[:i], row[i+1:]])
+            row = 1 / row
+            g_efficiency += row.mean()
+
+        g_efficiency /= l
+
+        cluster_stats['global_efficiency'] = g_efficiency
+
+        length_vals = length_df.values
+
+        l_efficiency = 0
+        for i, x in enumerate(corr_df):
+            col = corr_df[x].values
+            node_efficiency = 0
+            for j in range(i+1, l-1):
+                for h in range(j+1, l):
+                    node_efficiency += (col[j] * col[h] / length_vals[i, j]) ** (1 / 3)
+            s = col.sum()
+            node_efficiency /= s * (s - 1)
+
+            l_efficiency += node_efficiency
+
+        l_efficiency /= 2 * l
+
+        cluster_stats['local_efficiency'] = l_efficiency
+
+        return cluster_stats
 
     def get_network_degree(self, method="signal", thrs=None):
         """

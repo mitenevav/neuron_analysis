@@ -242,18 +242,21 @@ class Data:
 
             corrs[corr] = corr_distr[corr].groupby("model").agg(agg_functions)
 
-            cl_stats = [
-                list(ActiveStateAnalyzer.get_cluster_stats(corr_tmp[x]))[2:] + [x]
-                for x in corr_tmp
-            ]
-            cluster_stats[corr] = pd.DataFrame(
-                cl_stats,
-                columns=[
-                    f"intercluster_dist_{corr}",
-                    f"intracluster_dist_{corr}",
-                    "model",
-                ],
-            )
+            cl_stats = []
+            for x in corr_tmp:
+                cl_stat = ActiveStateAnalyzer.get_cluster_stats(corr_tmp[x])
+                cl_stat['z_score'] = np.mean(cl_stat['z_score'])
+                cl_stat['participation'] = np.mean(cl_stat['participation'])
+                cl_stat['centrality'] = np.mean(cl_stat['centrality'])
+
+                cl_new_stat = {}
+                for st in cl_stat:
+                    cl_new_stat[f'{st}_{corr}'] = cl_stat[st]
+
+                cl_new_stat['model'] = x
+                cl_stats.append(cl_new_stat)
+
+            cluster_stats[corr] = pd.DataFrame(cl_stats)
 
         df_network_degree = {}
         for corr in tqdm(

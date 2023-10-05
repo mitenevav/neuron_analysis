@@ -237,6 +237,17 @@ class ActiveStateAnalyzerWidgets:
             readout_format=".3f",
         )
 
+        resolution = widgets.FloatSlider(
+            value=1,
+            min=0,
+            max=5,
+            step=0.05,
+            description="cluster resolution",
+            continuous_update=False,
+            readout=True,
+            readout_format=".2f",
+        )
+
         position = widgets.Checkbox(
             value=False, description="Position", disabled=False, indent=False
         )
@@ -258,13 +269,15 @@ class ActiveStateAnalyzerWidgets:
                 "threshold": threshold,
                 "position": position,
                 "lag": lag,
+                "resolution": resolution,
             },
         )
 
         left_box = widgets.VBox([corr_method, position])
-        right_box = widgets.VBox([threshold, lag])
+        center_box = widgets.VBox([threshold, lag])
+        right_box = widgets.VBox([resolution])
 
-        display(widgets.HBox([left_box, right_box]))
+        display(widgets.HBox([left_box, center_box, right_box]))
         display(corr)
 
     @staticmethod
