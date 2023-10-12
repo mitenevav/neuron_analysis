@@ -219,7 +219,7 @@ class Data:
         df_corr = {}
         corr_distr = {}
         corrs = {}
-        cluster_stats = {}
+        # cluster_stats = {}
         for corr in tqdm(
             corr_types,
             disable=self.disable_verbose,
@@ -242,21 +242,21 @@ class Data:
 
             corrs[corr] = corr_distr[corr].groupby("model").agg(agg_functions)
 
-            cl_stats = []
-            for x in corr_tmp:
-                cl_stat = ActiveStateAnalyzer.get_cluster_stats(corr_tmp[x])
-                cl_stat['z_score'] = np.mean(cl_stat['z_score'])
-                cl_stat['participation'] = np.mean(cl_stat['participation'])
-                cl_stat['centrality'] = np.mean(cl_stat['centrality'])
+            # cl_stats = []
+            # for x in corr_tmp:
+            #     cl_stat = ActiveStateAnalyzer.get_cluster_stats(corr_tmp[x])
+            #     cl_stat['z_score'] = np.mean(cl_stat['z_score'])
+            #     cl_stat['participation'] = np.mean(cl_stat['participation'])
+            #     cl_stat['centrality'] = np.mean(cl_stat['centrality'])
 
-                cl_new_stat = {}
-                for st in cl_stat:
-                    cl_new_stat[f'{st}_{corr}'] = cl_stat[st]
+            #     cl_new_stat = {}
+            #     for st in cl_stat:
+            #         cl_new_stat[f'{st}_{corr}'] = cl_stat[st]
 
-                cl_new_stat['model'] = x
-                cl_stats.append(cl_new_stat)
+            #     cl_new_stat['model'] = x
+            #     cl_stats.append(cl_new_stat)
 
-            cluster_stats[corr] = pd.DataFrame(cl_stats)
+            # cluster_stats[corr] = pd.DataFrame(cl_stats)
 
         df_network_degree = {}
         for corr in tqdm(
@@ -291,8 +291,8 @@ class Data:
         for corr in corr_types:
             data = data.merge(df_network_degree[corr].reset_index(), on="model")
 
-        for corr in corr_types:
-            data = data.merge(cluster_stats[corr], on="model")
+        # for corr in corr_types:
+        #     data = data.merge(cluster_stats[corr], on="model")
 
         data = data.set_index("model")
 
