@@ -750,7 +750,7 @@ class ActiveStateAnalyzer:
         Function for computing stats in correlation clusters
         :param corr_df: dataframe with correlation values
         :param resolution: resolution parameter for modularity
-        :return: dict with z-score(list), participation(list)
+        :return: dict with z-score(list), participation(list), number_of_clusters(int), mean_cluster_size(float)
         """
         corr_df = corr_df.abs()
 
@@ -783,6 +783,9 @@ class ActiveStateAnalyzer:
         participation = 1 - participation / (corr_df.sum() - 1) ** 2
 
         cluster_stats['participation'] = participation.tolist()
+
+        cluster_stats['number_of_clusters'] = len(cl_idx)
+        cluster_stats['mean_cluster_size'] = len(corr_df) / len(cl_idx)
 
         return cluster_stats
     
@@ -941,6 +944,7 @@ class ActiveStateAnalyzer:
         Function for saving all ActiveStateAnalyzer results
         """
         self.save_active_states()
+        self.signals.to_excel(self.results_folder+'/signals.xlsx')
         self.save_burst_rate()
         self.save_network_spike_rate(1)
         self.save_network_spike_peak(1)

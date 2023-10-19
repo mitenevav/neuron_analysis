@@ -93,6 +93,8 @@ class GraphAnalysis(Data):
         cl_stat = model.get_cluster_stats(corr_df, resolution=resolution)
         stat['z_score'] = np.mean(cl_stat['z_score'])
         stat['participation'] = np.mean(cl_stat['participation'])
+        stat['number_of_clusters'] = cl_stat['number_of_clusters']
+        stat['mean_cluster_size'] = cl_stat['mean_cluster_size']
 
         for x in stat:
             print(f"{x}: {stat[x]}\n")
@@ -110,6 +112,8 @@ class GraphAnalysis(Data):
                 cl_stat = self.models[x].get_cluster_stats(self.corr_data[corr][x], resolution=resolution)
                 stat['z_score'] = np.mean(cl_stat['z_score'])
                 stat['participation'] = np.mean(cl_stat['participation'])
+                stat['number_of_clusters'] = cl_stat['number_of_clusters']
+                stat['mean_cluster_size'] = cl_stat['mean_cluster_size']
                 all_stats.append(stat)
 
         all_stats = pd.DataFrame(all_stats)
