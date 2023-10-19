@@ -843,7 +843,7 @@ class ActiveStateAnalyzer:
 
             l_efficiency += node_efficiency
 
-        l_efficiency /= 2 * l
+        l_efficiency /= l
 
         graph_stats['local_efficiency'] = l_efficiency
 
